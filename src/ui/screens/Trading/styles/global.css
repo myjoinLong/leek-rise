@@ -1,0 +1,23 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-base, #14171F);
+  color: var(--text-primary, #E8EAED);
+  font-family: var(--font-sans, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 让数字对齐 */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 滚动条隐藏但保留滚动功能 */
+::-webkit-scrollbar {
+  display: none;
+}
