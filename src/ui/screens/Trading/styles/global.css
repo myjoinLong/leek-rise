@@ -4,12 +4,80 @@
   padding: 0;
 }
 
+:root {
+  --pnl-base-source: var(--bg-base);
+  --pnl-surface-source: var(--bg-surface);
+  --pnl-elevated-source: var(--bg-elevated);
+  --pnl-input-source: var(--bg-input);
+}
+
 body {
+  --pnl-tint: var(--pnl-base-source);
+  --pnl-strength: 0%;
+  --bg-base: color-mix(in srgb, var(--pnl-base-source) calc(100% - var(--pnl-strength)), var(--pnl-tint) var(--pnl-strength));
+  --bg-surface: color-mix(in srgb, var(--pnl-surface-source) calc(100% - var(--pnl-strength)), var(--pnl-tint) var(--pnl-strength));
+  --bg-elevated: color-mix(in srgb, var(--pnl-elevated-source) calc(100% - var(--pnl-strength)), var(--pnl-tint) var(--pnl-strength));
+  --bg-input: color-mix(in srgb, var(--pnl-input-source) calc(100% - var(--pnl-strength)), var(--pnl-tint) var(--pnl-strength));
+  --font-sans: 'Courier New', monospace;
+  --radius-md: var(--radius-sm);
+  --radius-lg: var(--radius-sm);
+  --shadow-card: 4px 4px 0 #000;
+  --shadow-float: 4px 4px 0 #000;
   background-color: var(--bg-base, #14171F);
   color: var(--text-primary, #E8EAED);
-  font-family: var(--font-sans, sans-serif);
+  font-family: 'Courier New', monospace;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 280ms ease;
+}
+
+body[data-pnl-mood='profit'] {
+  --pnl-tint: var(--up);
+  --pnl-strength: 24%;
+}
+
+body[data-pnl-mood='loss'] {
+  --pnl-tint: var(--down);
+  --pnl-strength: 24%;
+}
+
+body[data-pnl-mood='neutral'] {
+  --pnl-tint: var(--pnl-base-source);
+  --pnl-strength: 0%;
+}
+
+.start-screen { --scene-x: 0%; --scene-y: 0%; }
+.pm-screen { --scene-x: 50%; --scene-y: 0%; }
+.dt-screen { --scene-x: 100%; --scene-y: 0%; }
+.trading-screen { --scene-x: 0%; --scene-y: 100%; }
+.ns-screen { --scene-x: 50%; --scene-y: 100%; }
+
+.scene-screen {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+
+.scene-screen::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image:
+    linear-gradient(180deg, rgba(13, 16, 22, 0.28), rgba(13, 16, 22, 0.72)),
+    linear-gradient(color-mix(in srgb, var(--pnl-tint) 15%, transparent), color-mix(in srgb, var(--pnl-tint) 15%, transparent)),
+    url('/art/pancheng-scenes.png');
+  background-repeat: no-repeat;
+  background-position: center, center, var(--scene-x) var(--scene-y);
+  background-size: 100% 100%, 100% 100%, 300% 200%;
+  content: '';
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+[class*='-card'], [class*='-dialog'], [class*='-panel'] {
+  border-radius: var(--radius-sm, 2px) !important;
+  border-width: 2px !important;
+  box-shadow: 4px 4px 0 #000 !important;
 }
 
 /* 让数字对齐 */
@@ -20,4 +88,24 @@ body {
 /* 滚动条隐藏但保留滚动功能 */
 ::-webkit-scrollbar {
   display: none;
+}
+
+.pm-screen, .trading-screen, .ns-screen, .dt-screen {
+  transition: background-color 280ms ease;
+}
+
+.save-warning {
+  position: fixed;
+  z-index: 1200;
+  top: calc(var(--safe-top) + var(--sp-2));
+  right: var(--sp-4);
+  left: var(--sp-4);
+  max-width: 448px;
+  margin: 0 auto;
+  padding: var(--sp-2);
+  border: 2px solid var(--warn);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: var(--fs-caption);
+  text-align: center;
 }
