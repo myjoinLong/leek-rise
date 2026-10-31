@@ -45,7 +45,10 @@ export function traceCompletedActivity(activity: ActiveActivityState): NpcActivi
     }
     case 'CHEN_DOSSIER':
       return {
-        ...createTrace(activity, activity.evidence.map((evidence) => evidence.choice), activity.conclusion, null, activity.reliableCount),
+        ...createTrace(activity, [
+          ...(activity.openingChoice ? [`CHEN_OPENING_${activity.openingChoice}`] : []),
+          ...activity.evidence.map((evidence) => evidence.choice),
+        ], activity.conclusion, null, activity.reliableCount),
         ...(activity.scenarioVersion === 2 ? {
           scenarioVersion: activity.scenarioVersion,
           scenarioSeed: activity.scenarioSeed ?? 4,

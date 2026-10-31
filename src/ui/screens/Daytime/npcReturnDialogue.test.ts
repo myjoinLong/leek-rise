@@ -149,6 +149,27 @@ describe('NPC return dialogue', () => {
     expect(dialogueForEntry(jiuge, state)).toContain('那张只写总数的糊涂账');
   });
 
+  it('carries Chen’s case-file choice into the next street visit', () => {
+    const state = createInitialState();
+    const chen = entries.find((entry) => entry.id === 'chen');
+    if (!chen) throw new Error('Missing Chen street entry.');
+    state.npcActivityMemory.chen = {
+      completedRuns: 1,
+      lastCompletedDay: 11,
+      lastTrace: { ...memoryTraces.chen, choiceKeys: ['CHEN_OPENING_APPEND_REVISION', ...memoryTraces.chen.choiceKeys] },
+      recentTraces: [{ ...memoryTraces.chen, choiceKeys: ['CHEN_OPENING_APPEND_REVISION', ...memoryTraces.chen.choiceKeys] }],
+    };
+
+    expect(dialogueForEntry(chen, state)).toContain('我把修正和依据都留在案卷里');
+    expect(dialogueForEntry(chen, state)).toContain('你核过核查公告、核对供应商');
+
+    state.npcActivityMemory.chen.recentTraces = [
+      { ...memoryTraces.chen, day: 8 },
+      { ...memoryTraces.chen, day: 11, choiceKeys: ['CHEN_OPENING_APPEND_REVISION', ...memoryTraces.chen.choiceKeys] },
+    ];
+    expect(dialogueForEntry(chen, state)).toContain('他把修订依据也夹进了案卷');
+  });
+
   it('lets Sujie respond to the change between the previous and latest shift', () => {
     const state = createInitialState();
     const previous = { ...memoryTraces.sujie, day: 4, score: 1, cashDelta: 107 };

@@ -74,7 +74,7 @@ export function createCompanyDossier(
     scenarioVersion: companyDossierScenarioVersion,
     scenarioSeed,
     scenarioIndex: companyDossierScenarioIndex(day, scenarioSeed),
-    ...(priorReview ? { priorReview } : {}),
+    ...(priorReview ? { priorReview, openingFlowVersion: 1 as const } : {}),
     status: 'ACTIVE',
     step: 0,
     evidence: [],
@@ -174,6 +174,7 @@ export function reduceCompanyDossier(
     case 'CHOOSE_CHEN_EVIDENCE': {
       const run = state.activeActivity;
       if (state.phase !== 'DAYTIME' || !run || run.id !== 'CHEN_DOSSIER' || run.status !== 'ACTIVE' || run.day !== state.day) return state;
+      if (run.openingFlowVersion === 1 && run.priorReview && !run.openingChoice) return state;
       const option = evidenceOptions[action.choice];
       if (option.step !== run.step || state.energy < option.energyCost) return state;
       const evidence: CompanyDossierEvidence = {
@@ -186,6 +187,13 @@ export function reduceCompanyDossier(
         energy: state.energy - option.energyCost,
         activeActivity: { ...run, step: (run.step + 1) as CompanyDossierActiveState['step'], evidence: [...run.evidence, evidence] },
       };
+    }
+    case 'CHOOSE_CHEN_OPENING': {
+      const run = state.activeActivity;
+      if (state.phase !== 'DAYTIME' || !run || run.id !== 'CHEN_DOSSIER' || run.status !== 'ACTIVE' || run.day !== state.day
+        || run.openingFlowVersion !== 1 || !run.priorReview || run.openingChoice || run.step !== 0 || run.evidence.length !== 0
+        || (action.choice !== 'APPEND_REVISION' && action.choice !== 'KEEP_SEPARATE')) return state;
+      return { ...state, activeActivity: { ...run, openingChoice: action.choice } };
     }
     case 'CONCLUDE_CHEN_DOSSIER': {
       const run = state.activeActivity;

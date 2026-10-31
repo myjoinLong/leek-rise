@@ -99,11 +99,13 @@ const companyDossierPriorReviewSchema = z.object({
 const companyDossierSchema = z.discriminatedUnion('status', [
   z.object({ id: z.literal('CHEN_DOSSIER'), day: z.number().int().positive(), stockId: z.string(),
       caseType: z.enum(['REAL_CONTRACT', 'INFLATED_ORDER', 'NO_CATALYST']), ...companyDossierScenarioFields,
-    priorReview: companyDossierPriorReviewSchema.optional(), status: z.literal('ACTIVE'),
+    priorReview: companyDossierPriorReviewSchema.optional(), openingFlowVersion: z.literal(1).optional(),
+    openingChoice: z.enum(['APPEND_REVISION', 'KEEP_SEPARATE']).optional(), status: z.literal('ACTIVE'),
     step: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), evidence: z.array(companyDossierEvidenceSchema).max(3) }),
   z.object({ id: z.literal('CHEN_DOSSIER'), day: z.number().int().positive(), stockId: z.string(),
       caseType: z.enum(['REAL_CONTRACT', 'INFLATED_ORDER', 'NO_CATALYST']), ...companyDossierScenarioFields,
-    priorReview: companyDossierPriorReviewSchema.optional(), status: z.literal('RESULT'), step: z.literal(3),
+    priorReview: companyDossierPriorReviewSchema.optional(), openingFlowVersion: z.literal(1).optional(),
+    openingChoice: z.enum(['APPEND_REVISION', 'KEEP_SEPARATE']).optional(), status: z.literal('RESULT'), step: z.literal(3),
     evidence: z.tuple([companyDossierEvidenceSchema, companyDossierEvidenceSchema, companyDossierEvidenceSchema]),
     conclusion: z.enum(['BUY', 'AVOID', 'WAIT']), correct: z.boolean(), reliableCount: z.number().int().min(0).max(3), intel: marketIntelSchema }),
 ]);

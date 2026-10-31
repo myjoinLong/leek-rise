@@ -22,7 +22,7 @@ const activityReducers: Record<ActivityId, ActivityReducer> = {
   LONGGE_CHAT: reduceLonggeChatAction,
   XIAOLIAN_STREAM: reduceStreamRunAction,
   CHEN_DOSSIER: (state, action) => {
-    if (action.type === 'START_CHEN_DOSSIER' || action.type === 'CHOOSE_CHEN_EVIDENCE'
+    if (action.type === 'START_CHEN_DOSSIER' || action.type === 'CHOOSE_CHEN_OPENING' || action.type === 'CHOOSE_CHEN_EVIDENCE'
       || action.type === 'CONCLUDE_CHEN_DOSSIER' || action.type === 'ABANDON_CHEN_DOSSIER') {
       return reduceCompanyDossier(state, action);
     }

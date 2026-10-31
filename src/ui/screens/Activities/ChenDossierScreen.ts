@@ -1,5 +1,5 @@
 import type { GameAction } from '../../../core/reducer';
-import type { CompanyDossierChoice, CompanyDossierConclusion, CompanyDossierEvidence, CompanyDossierResultState, CompanyDossierState, GameState } from '../../../core/types';
+import type { CompanyDossierChoice, CompanyDossierConclusion, CompanyDossierEvidence, CompanyDossierOpeningChoice, CompanyDossierResultState, CompanyDossierState, GameState } from '../../../core/types';
 import { companyDossierScenarioForRun } from '../../../core/systems/companyDossierScenarios';
 
 const choiceLabels: Record<CompanyDossierChoice, string> = {
@@ -89,6 +89,10 @@ function isConclusion(value: string | undefined): value is CompanyDossierConclus
   return value === 'BUY' || value === 'AVOID' || value === 'WAIT';
 }
 
+function isOpeningChoice(value: string | undefined): value is CompanyDossierOpeningChoice {
+  return value === 'APPEND_REVISION' || value === 'KEEP_SEPARATE';
+}
+
 function renderEvidence(evidence: CompanyDossierEvidence[], run: CompanyDossierState): string {
   const scenario = companyDossierScenarioForRun(run);
   return evidence.length === 0 ? '' : '<ol class="cd-evidence">' + evidence.map((record) =>
@@ -113,16 +117,25 @@ function renderScenario(run: CompanyDossierState): string {
     : '';
 }
 
+function renderOpeningChoices(run: CompanyDossierState): string {
+  if (run.openingFlowVersion !== 1 || !run.priorReview || run.openingChoice) return '';
+  return '<h2>这次的材料，怎么和上回那份记录放在一起？</h2><div class="cd-choices">' +
+    '<button class="cd-choice" type="button" data-opening-choice="APPEND_REVISION"><strong>把新旧结论并列归档</strong><span>回执会记录本次相对上次是维持还是修正；不改变今天的证据和情报。</span></button>' +
+    '<button class="cd-choice" type="button" data-opening-choice="KEEP_SEPARATE"><strong>只记录今天这份材料</strong><span>本案独立归档；旧结论不作为今天的证据。</span></button></div>';
+}
+
 function renderActive(state: GameState): string {
   const run = state.activeActivity;
   if (!run || run.id !== 'CHEN_DOSSIER') return '';
   if (run.step < 3) {
     const detail = run.step === 0 ? stepDetails[0] : run.step === 1 ? stepDetails[1] : stepDetails[2];
+    const openingChoices = run.step === 0 ? renderOpeningChoices(run) : '';
+    const choices = openingChoices || '<div class="cd-choices">' + detail.choices.map((option) =>
+      '<button class="cd-choice" type="button" data-choice="' + option.id + '"' + (state.energy < option.cost ? ' disabled' : '') + '>' +
+      '<strong>' + option.label + '</strong><span>' + option.note + '</span></button>',
+    ).join('') + '</div>';
     return '<section class="cd-card"><p class="cd-step">资料核验 ' + (run.step + 1) + ' / 3 · ' + detail.title + '</p>' +
-      renderScenario(run) + '<p class="cd-prompt">' + detail.prompt + '</p><div class="cd-choices">' + detail.choices.map((option) =>
-        '<button class="cd-choice" type="button" data-choice="' + option.id + '"' + (state.energy < option.cost ? ' disabled' : '') + '>' +
-        '<strong>' + option.label + '</strong><span>' + option.note + '</span></button>',
-      ).join('') + '</div>' + renderEvidence(run.evidence, run) +
+      renderScenario(run) + '<p class="cd-prompt">' + (openingChoices ? '先定下这份案卷的记录方式。' : detail.prompt) + '</p>' + choices + renderEvidence(run.evidence, run) +
       '<button class="cd-exit" type="button" data-action="abandon">结束调查并离开</button></section>';
   }
   return '<section class="cd-card"><p class="cd-step">材料已整理 · ' + run.evidence.length + ' / 3</p>' +
@@ -142,6 +155,16 @@ function getConfidenceLabel(run: CompanyDossierResultState): string {
   return run.reliableCount === 1 ? '只有一项可核验材料' : '可核验材料不足以形成一致方向';
 }
 
+function renderReviewDisposition(run: CompanyDossierResultState): string {
+  if (!run.priorReview || !run.openingChoice) return '';
+  if (run.openingChoice === 'KEEP_SEPARATE') {
+    return '<p class="cd-memory">独立归档：本次判断只依据今天的材料；上次结论没有作为本案证据。</p>';
+  }
+  const previous = run.priorReview.conclusion;
+  const disposition = previous === run.conclusion ? '结论维持' : '结论已修正';
+  return '<p class="cd-memory">并列复核：第 ' + run.priorReview.previousDay + ' 天的结论为 ' + previous + '，本次为 ' + run.conclusion + '，' + disposition + '。这项记录不改变情报可信度。</p>';
+}
+
 function renderResult(state: GameState): string {
   const run = state.activeActivity;
   if (!run || run.id !== 'CHEN_DOSSIER' || run.status !== 'RESULT') return '';
@@ -154,7 +177,7 @@ function renderResult(state: GameState): string {
       : run.correct ? '判断方向与多数材料相符' : '判断和核验记录不一致';
   return '<section class="cd-card cd-result"><p class="cd-step">陈总的材料调查回执</p><h2>' +
     heading +
-    '</h2>' + renderScenario(run) + '<p>你的处理：' + decision + ' · ' + confidence + '</p><p class="cd-receipt">' + escapeHtml(run.intel.message) + '</p>' +
+    '</h2>' + renderScenario(run) + renderReviewDisposition(run) + '<p>你的处理：' + decision + ' · ' + confidence + '</p><p class="cd-receipt">' + escapeHtml(run.intel.message) + '</p>' +
     renderEvidence(run.evidence, run) + '<button class="cd-return" type="button" data-action="return">带着材料结论回街区</button></section>';
 }
 
@@ -192,9 +215,11 @@ export function createChenDossierScreen(
     const target = event.target;
     if (!(target instanceof Element)) return;
     const choice = target.closest<HTMLElement>('[data-choice]')?.dataset.choice;
+    const openingChoice = target.closest<HTMLElement>('[data-opening-choice]')?.dataset.openingChoice;
     const conclusion = target.closest<HTMLElement>('[data-conclusion]')?.dataset.conclusion;
     const action = target.closest<HTMLElement>('[data-action]')?.dataset.action;
-    if (isChoice(choice)) dispatch({ type: 'CHOOSE_CHEN_EVIDENCE', choice });
+    if (isOpeningChoice(openingChoice)) dispatch({ type: 'CHOOSE_CHEN_OPENING', choice: openingChoice });
+    else if (isChoice(choice)) dispatch({ type: 'CHOOSE_CHEN_EVIDENCE', choice });
     else if (isConclusion(conclusion)) dispatch({ type: 'CONCLUDE_CHEN_DOSSIER', conclusion });
     else if (action === 'abandon') dispatch({ type: 'ABANDON_CHEN_DOSSIER' });
     else if (action === 'return') dispatch({ type: 'RETURN_FROM_ACTIVITY' });

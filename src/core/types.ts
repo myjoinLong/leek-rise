@@ -35,10 +35,12 @@ export type StreamChoice = 'HONEST_REVIEW' | 'HYPE_CLAIM' | 'ANSWER_QUESTIONS' |
 export type StreamStep = 0 | 1 | 2;
 export type CompanyDossierChoice = 'VERIFY_FILING' | 'SKIM_PITCH' | 'CHECK_SUPPLIER' | 'ASK_SALES' | 'MATCH_INVOICES' | 'READ_FORECAST';
 export type CompanyDossierConclusion = 'BUY' | 'AVOID' | 'WAIT';
+export type CompanyDossierOpeningChoice = 'APPEND_REVISION' | 'KEEP_SEPARATE';
 export type CompanyDossierCaseType = 'REAL_CONTRACT' | 'INFLATED_ORDER' | 'NO_CATALYST';
 export type CompanyDossierFinding = 'CONTRACT' | 'HYPE' | 'NO_CATALYST' | 'UNVERIFIED';
 export type CompanyDossierAction =
   | { type: 'START_CHEN_DOSSIER' }
+  | { type: 'CHOOSE_CHEN_OPENING'; choice: CompanyDossierOpeningChoice }
   | { type: 'CHOOSE_CHEN_EVIDENCE'; choice: CompanyDossierChoice }
   | { type: 'CONCLUDE_CHEN_DOSSIER'; conclusion: CompanyDossierConclusion }
   | { type: 'ABANDON_CHEN_DOSSIER' };
@@ -117,6 +119,8 @@ export interface CompanyDossierActiveState {
   scenarioSeed?: number;
   scenarioIndex?: number;
   priorReview?: CompanyDossierPriorReview;
+  openingFlowVersion?: 1;
+  openingChoice?: CompanyDossierOpeningChoice;
   status: 'ACTIVE';
   step: 0 | 1 | 2 | 3;
   evidence: CompanyDossierEvidence[];

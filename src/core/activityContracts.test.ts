@@ -15,6 +15,7 @@ const activityActionSamples: readonly GameAction[] = [
   { type: 'CHOOSE_LONGGE_CLUE', choice: 'VERIFY_ORIGIN' },
   { type: 'CONCLUDE_LONGGE_CHAT', conclusion: 'DISTRIBUTION' },
   { type: 'CHOOSE_STREAM_OPTION', choice: 'HONEST_REVIEW' },
+  { type: 'CHOOSE_CHEN_OPENING', choice: 'APPEND_REVISION' },
   { type: 'CHOOSE_CHEN_EVIDENCE', choice: 'VERIFY_FILING' },
   { type: 'CONCLUDE_CHEN_DOSSIER', conclusion: 'BUY' },
   { type: 'ASK_JIUGE_HISTORY' },

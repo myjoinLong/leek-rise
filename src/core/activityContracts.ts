@@ -39,7 +39,7 @@ export const activityContracts = {
     purpose: 'information',
     startAction: { type: 'START_CHEN_DOSSIER' },
     exitAction: { type: 'ABANDON_CHEN_DOSSIER' },
-    allowedActions: ['CHOOSE_CHEN_EVIDENCE', 'CONCLUDE_CHEN_DOSSIER', 'ABANDON_CHEN_DOSSIER'],
+    allowedActions: ['CHOOSE_CHEN_OPENING', 'CHOOSE_CHEN_EVIDENCE', 'CONCLUDE_CHEN_DOSSIER', 'ABANDON_CHEN_DOSSIER'],
   },
   JIUGE_NEGOTIATION: {
     npcId: 'jiuge',

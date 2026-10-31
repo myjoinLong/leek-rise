@@ -90,7 +90,7 @@ describe('Chen company dossier', () => {
         chen: { ...memory, lastTrace: previousTrace },
       },
     });
-    expect(state.activeActivity).toMatchObject({ priorReview: { previousDay: 2, conclusion: 'AVOID' } });
+    expect(state.activeActivity).toMatchObject({ priorReview: { previousDay: 2, conclusion: 'AVOID' }, openingFlowVersion: 1 });
 
     const noDate = startDossier({
       day: 4,
@@ -100,6 +100,38 @@ describe('Chen company dossier', () => {
       },
     });
     expect(noDate.activeActivity?.id === 'CHEN_DOSSIER' && noDate.activeActivity.priorReview).toBeUndefined();
+  });
+
+  it.each(['APPEND_REVISION', 'KEEP_SEPARATE'] as const)('records Chen follow-up choice %s without changing today’s evidence or intel', (choice) => {
+    const initial = createInitialState();
+    const memory = initial.npcActivityMemory.chen;
+    const priorTrace = {
+      day: 2,
+      activityId: 'CHEN_DOSSIER' as const,
+      choiceKeys: ['VERIFY_FILING', 'CHECK_SUPPLIER', 'MATCH_INVOICES'],
+      outcomeCode: 'WAIT',
+      cashDelta: null,
+      score: 3,
+    };
+    let state = startDossier({
+      day: 4,
+      energy: 18,
+      npcActivityMemory: { ...initial.npcActivityMemory, chen: { ...memory, lastTrace: priorTrace } },
+    });
+    if (state.activeActivity?.id !== 'CHEN_DOSSIER') throw new Error('Dossier did not start.');
+    const startingCash = state.cash;
+    expect(gameReducer(state, { type: 'CHOOSE_CHEN_EVIDENCE', choice: 'VERIFY_FILING' })).toBe(state);
+    state = gameReducer(state, { type: 'CHOOSE_CHEN_OPENING', choice });
+    state = gameReducer(state, { type: 'CHOOSE_CHEN_EVIDENCE', choice: 'VERIFY_FILING' });
+    state = gameReducer(state, { type: 'CHOOSE_CHEN_EVIDENCE', choice: 'CHECK_SUPPLIER' });
+    state = gameReducer(state, { type: 'CHOOSE_CHEN_EVIDENCE', choice: 'MATCH_INVOICES' });
+    state = gameReducer(state, { type: 'CONCLUDE_CHEN_DOSSIER', conclusion: 'WAIT' });
+
+    expect(state.activeActivity).toMatchObject({ status: 'RESULT', openingChoice: choice, conclusion: 'WAIT' });
+    expect(state.activeActivity?.id === 'CHEN_DOSSIER' && state.activeActivity.evidence).toHaveLength(3);
+    expect(state.cash).toBe(startingCash);
+    expect(state.marketIntel?.confidence).toBe('HIGH');
+    expect(state.npcActivityMemory.chen.lastTrace?.choiceKeys).toContain(`CHEN_OPENING_${choice}`);
   });
 
   it('uses verified records to produce high-confidence market information without changing cash', () => {

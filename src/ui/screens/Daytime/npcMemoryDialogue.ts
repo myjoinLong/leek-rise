@@ -20,6 +20,7 @@ const choiceLabels: Partial<Record<NpcActivityId, Record<string, string>>> = {
   CHEN_DOSSIER: {
     VERIFY_FILING: '核查公告', SKIM_PITCH: '浏览宣传稿', CHECK_SUPPLIER: '核对供应商', ASK_SALES: '询问销售',
     MATCH_INVOICES: '比对发票', READ_FORECAST: '查看预测',
+    CHEN_OPENING_APPEND_REVISION: '并列归档新旧结论', CHEN_OPENING_KEEP_SEPARATE: '让今天材料独立归档',
   },
   BODHISATTVA_CHART_LESSON: {
     RIDE_HIGHER_LOWS: '观察更高低点', CHASE_LAST_SPIKE: '追最后一根拉升', SELL_FIRST_PULLBACK: '首次回落就卖',
@@ -97,7 +98,18 @@ function voiceFor(npcId: NpcId, trace: NpcActivityMemoryTrace): string | null {
         : `九哥把上回的条款翻出来：“你选的是${outcome}，我照签下的条件记；本金和利息都不会凭空消失。”`;
     }
     case 'longge': return `龙哥瞄了眼群聊记录：“上回你查了${choiceSummary || '几条线索'}。转发不算原始证据，今天这条还得重新验。”`;
-    case 'chen': return `陈总把上次的资料夹推过来：“你核过${choiceSummary || '几份材料'}，最后${outcome ?? '没有记录结论'}；缺的凭证，我不会替它补成事实。”`;
+    case 'chen': {
+      const evidenceSummary = choicesFor({
+        ...trace,
+        choiceKeys: trace.choiceKeys.filter((choice) => !choice.startsWith('CHEN_OPENING_')),
+      }).join('、');
+      const archiveChoice = trace.choiceKeys.includes('CHEN_OPENING_APPEND_REVISION')
+        ? '你上次要求并列归档新旧结论，我把修正和依据都留在案卷里。'
+        : trace.choiceKeys.includes('CHEN_OPENING_KEEP_SEPARATE')
+          ? '你上次要求新案卷独立记录，我没有拿旧结论替今天的材料作证。'
+          : null;
+      return `陈总把上次的资料夹推过来：“你核过${evidenceSummary || '几份材料'}，最后${outcome ?? '没有记录结论'}；缺的凭证，我不会替它补成事实。${archiveChoice ?? ''}”`;
+    }
     case 'bodhisattva': return `K线菩萨在旧讲义上画了个圈：“上回三张图你答对 ${trace.score ?? 0}/3。记住做对题不等于预测对了市场。”`;
     case 'xiaolian': return `小镰刀看了眼上场回放：“你选了${choiceSummary || '自己的讲法'}，那场进账${amount ?? '¥0'}，流量变化 ${trace.score ?? 0}。这两笔我分开记。”`;
     case 'sujie': return `苏姐把上次的单子夹进本子：“三位客人里你听准了 ${trace.score ?? 0} 杯，收入${amount ?? '¥0'}。${choiceSummary ? `你选过${choiceSummary}。` : ''}今天的客人还得重新听需求。”`;
@@ -150,7 +162,7 @@ function continuityVoice(
         : null;
     case 'chen':
       return previous.score !== null && latest.score !== null
-        ? `陈总把两份调查并排：“${previousVisit}找到 ${previous.score} 条可靠证据，${latestVisit}找到 ${latest.score} 条。没核实的部分，我仍不会写成事实。”`
+        ? `陈总把两份调查并排：“${previousVisit}找到 ${previous.score} 条可靠证据，${latestVisit}找到 ${latest.score} 条。没核实的部分，我仍不会写成事实。”${latest.choiceKeys.includes('CHEN_OPENING_APPEND_REVISION') ? ' 他把修订依据也夹进了案卷。' : latest.choiceKeys.includes('CHEN_OPENING_KEEP_SEPARATE') ? ' 他把今天的材料留在独立案卷里。' : ''}`
         : null;
     case 'bodhisattva':
       return previous.score !== null && latest.score !== null

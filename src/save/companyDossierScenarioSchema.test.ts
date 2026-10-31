@@ -12,6 +12,8 @@ describe('Chen dossier scenario save compatibility', () => {
     expect(activitySchema.safeParse(active).success).toBe(true);
     const remembered = { ...active, priorReview: { previousDay: 1, conclusion: 'AVOID' } };
     expect(activitySchema.safeParse(remembered).success).toBe(true);
+    expect(activitySchema.safeParse({ ...remembered, openingFlowVersion: 1, openingChoice: 'APPEND_REVISION' }).success).toBe(true);
+    expect(activitySchema.safeParse({ ...remembered, openingFlowVersion: 1, openingChoice: 'INVALID' }).success).toBe(false);
     expect(activitySchema.safeParse({ ...active, priorReview: { previousDay: 0, conclusion: 'AVOID' } }).success).toBe(false);
     const legacyActive = { ...active };
     delete legacyActive.scenarioVersion;
