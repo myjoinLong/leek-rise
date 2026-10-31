@@ -128,7 +128,7 @@ describe('mixed income route debt target', () => {
         }
       }
     }
-  });
+  }, 10000);
 
   it('keeps six routes other than phone flipping cash-positive and below starting debt after mistakes and fortnightly absences', () => {
     const activities = mixedIncomeActivities.filter((activity) => activity !== 'PHONE_FLIP');

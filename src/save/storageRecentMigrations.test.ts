@@ -22,6 +22,19 @@ beforeEach(() => {
 });
 
 describe('game save migration', () => {
+  it('adds a default codename when loading a v27 save', async () => {
+    const currentState = createInitialState(456);
+    const { codename, ...versionTwentySevenState } = currentState;
+    void codename;
+    mockStore.value = { version: 27, savedAt: 1, state: versionTwentySevenState };
+
+    const migrated = await loadSavedGame();
+
+    expect(migrated).toMatchObject({ codename: '盘城新客', cash: currentState.cash, day: currentState.day });
+    await saveGame(migrated!);
+    expect(mockStore.value).toMatchObject({ version: 28, state: { codename: '盘城新客' } });
+  });
+
   it('adds the new catalog listings to a v26 save without changing the existing holding', async () => {
     const current = createInitialState(91);
     const dragon = current.stocks.dragon;
@@ -45,7 +58,7 @@ describe('game save migration', () => {
     expect(migrated?.stocks.harbor?.holding).toBeUndefined();
 
     await saveGame(migrated!);
-    expect(mockStore.value).toMatchObject({ version: 27 });
+    expect(mockStore.value).toMatchObject({ version: 28 });
   });
 
   it('adds the market clock to v18 saves and preserves current tick progress', async () => {
@@ -72,7 +85,7 @@ describe('game save migration', () => {
 
     expect(migrated).toEqual({ ...previousState, debtCrisisRecoveryDay: null });
     await saveGame(migrated!);
-    expect(mockStore.value).toMatchObject({ version: 27 });
+    expect(mockStore.value).toMatchObject({ version: 28 });
 
     const { gameReducer } = await import('../core/reducer');
     const phoneState = gameReducer({ ...createInitialState(), phase: 'DAYTIME' }, { type: 'START_PHONE_FLIP' });
@@ -90,7 +103,7 @@ describe('game save migration', () => {
     expect(migrated).toEqual({ ...versionTwentyState, debtCrisisRecoveryDay: null });
 
     await saveGame(currentState);
-    expect(mockStore.value).toMatchObject({ version: 27, state: { debtCrisisRecoveryDay: 31 } });
+    expect(mockStore.value).toMatchObject({ version: 28, state: { debtCrisisRecoveryDay: 31 } });
     expect(await loadSavedGame()).toEqual(currentState);
   });
 
@@ -103,7 +116,7 @@ describe('game save migration', () => {
 
     expect(migrated?.scenarioSeed).toBe(4);
     await saveGame(migrated!);
-    expect(mockStore.value).toMatchObject({ version: 27, state: { scenarioSeed: 4 } });
+    expect(mockStore.value).toMatchObject({ version: 28, state: { scenarioSeed: 4 } });
   });
 
   it('migrates a completed v22 activity into persistent NPC memory', async () => {
@@ -128,7 +141,7 @@ describe('game save migration', () => {
     });
     expect(migrated?.activeActivity).toMatchObject({ id: 'SUJIE_CAFE_SHIFT', status: 'RESULT' });
     await saveGame(migrated!);
-    expect(mockStore.value).toMatchObject({ version: 27 });
+    expect(mockStore.value).toMatchObject({ version: 28 });
     expect(await loadSavedGame()).toEqual(migrated);
   });
 
@@ -153,7 +166,7 @@ describe('game save migration', () => {
       lastTrace: { activityId: 'LONGGE_CHAT', outcomeCode: 'INSUFFICIENT' },
     });
     await saveGame(migrated!);
-    expect(mockStore.value).toMatchObject({ version: 27, state: { longgeLastConclusion: 'INSUFFICIENT' } });
+    expect(mockStore.value).toMatchObject({ version: 28, state: { longgeLastConclusion: 'INSUFFICIENT' } });
     expect(await loadSavedGame()).toEqual(migrated);
   });
 
@@ -170,7 +183,7 @@ describe('game save migration', () => {
     expect(restored?.npcActivityMemory).toEqual(state.npcActivityMemory);
   });
 
-  it('adds an empty bounded trace history to v25 saves and upgrades them to v26', async () => {
+  it('adds an empty bounded trace history to v25 saves and upgrades them to v28', async () => {
     const state = createInitialState();
     const oldMemory = Object.fromEntries(Object.entries(state.npcActivityMemory).map(([npcId, entry]) => [npcId, {
       completedRuns: entry.completedRuns,
@@ -188,7 +201,7 @@ describe('game save migration', () => {
       recentTraces: [],
     });
     await saveGame(restored!);
-    expect(mockStore.value).toMatchObject({ version: 27 });
+    expect(mockStore.value).toMatchObject({ version: 28 });
     expect(await loadSavedGame()).toEqual(restored);
   });
 
@@ -240,7 +253,7 @@ describe('game save migration', () => {
     expect(mockStore.value).toBeNull();
     await saveGame(state);
 
-    expect(mockStore.value).toMatchObject({ version: 27 });
+    expect(mockStore.value).toMatchObject({ version: 28 });
     expect(await loadSavedGame()).toEqual(state);
   });
 

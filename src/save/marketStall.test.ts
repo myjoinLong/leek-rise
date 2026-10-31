@@ -19,7 +19,7 @@ describe('Lao Liang stall save compatibility', () => {
     await saveGame(state);
 
     const restored = await loadSavedGame();
-    expect(saveVersion).toBe(27);
+    expect(saveVersion).toBe(28);
     expect(restored).toEqual(state);
     expect(restored?.workedToday).toBe(true);
     expect(restored?.activeActivity).toMatchObject({ id: 'LAOLIANG_MARKET_STALL', status: 'ACTIVE', scenarioVersion: 3, scenarioSeed: 4, selectedProduct: 'THERMOS' });

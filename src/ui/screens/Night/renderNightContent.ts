@@ -1,4 +1,5 @@
 import { firstChapterDeadlineDay, firstChapterMaximumDebt, firstChapterRepaymentTarget } from '../../../core/timeRules';
+import { fixedOperatingCostMultiplierForDay } from '../../../core/chapterRules';
 import type { NightVM } from './types';
 
 const htmlEntities: Record<string, string> = {
@@ -76,8 +77,16 @@ export function renderNightContent(state: NightVM): string {
     const crisisRecovery = state.debtCrisisRecoveredTonight
       ? `<section class="ns-crisis-recovery" role="status"><strong>债务危机已解除</strong><div>当前负债 ¥${state.debt.toLocaleString()}，已回到 ¥${firstChapterMaximumDebt.toLocaleString()} 门槛内。存档继续保留，你可以按自己的节奏经营。</div></section>`
       : '';
+    const costPolicy = state.periodicCostPolicy;
     const chapterGoal = state.day === firstChapterDeadlineDay
-      ? `<section class="ns-chapter-goal" aria-label="第一章还款目标"><strong>第一章 · 最后还款日</strong><div>第 ${firstChapterDeadlineDay} 天夜间还款后，负债需不高于 ¥${firstChapterMaximumDebt.toLocaleString()}（从 ¥18,000 起始负债计算，至少偿还 ¥${firstChapterRepaymentTarget.toLocaleString()}）。</div><div>当前负债 ¥${state.debt.toLocaleString()}${state.debt <= firstChapterMaximumDebt ? ' · 目标已达成' : ` · 还需偿还 ¥${(state.debt - firstChapterMaximumDebt).toLocaleString()}`}</div><div>点击进入下一天时检查；超过门槛将进入保留存档的债务危机阶段。</div></section>`
+      ? (() => {
+        const nextSettlementDay = (Math.floor(state.day / costPolicy.intervalDays) + 1) * costPolicy.intervalDays;
+        const nextMultiplier = fixedOperatingCostMultiplierForDay(nextSettlementDay);
+        const currentFixedCost = (costPolicy.rent + costPolicy.membership + costPolicy.equipment) * state.chapter.fixedCostMultiplier;
+        const nextFixedCost = (costPolicy.rent + costPolicy.membership + costPolicy.equipment) * nextMultiplier;
+        const nextFixedCostIncrease = nextFixedCost - currentFixedCost;
+        return `<section class="ns-chapter-goal" aria-label="第一章还款目标"><strong>第一章 · 最后还款日</strong><div>第 ${firstChapterDeadlineDay} 天夜间还款后，负债需不高于 ¥${firstChapterMaximumDebt.toLocaleString()}（从 ¥18,000 起始负债计算，至少偿还 ¥${firstChapterRepaymentTarget.toLocaleString()}）。</div><div>当前负债 ¥${state.debt.toLocaleString()}${state.debt <= firstChapterMaximumDebt ? ' · 目标已达成' : ` · 还需偿还 ¥${(state.debt - firstChapterMaximumDebt).toLocaleString()}`}</div><div>点击进入下一天时检查；超过门槛将进入保留存档的债务危机阶段。</div><strong>下一次周结 · 第 ${nextSettlementDay} 天</strong><div>第 31 天起进入第二章；第 ${nextSettlementDay} 天周结时，房租 ¥${(costPolicy.rent * nextMultiplier).toLocaleString()}、会员费 ¥${(costPolicy.membership * nextMultiplier).toLocaleString()}、设备费 ¥${(costPolicy.equipment * nextMultiplier).toLocaleString()}，固定支出合计 ¥${nextFixedCost.toLocaleString()}，比当前每周增加 ¥${nextFixedCostIncrease.toLocaleString()}。利息按届时负债与协商条款计算，直播分成仍按流水另计。</div></section>`;
+      })()
       : '';
     const chapterProgress = state.day < firstChapterDeadlineDay && !state.debtCrisisStarted
       ? (() => {
@@ -95,7 +104,7 @@ export function renderNightContent(state: NightVM): string {
         </section>`;
       })()
       : '';
-    const costPolicy = state.periodicCostPolicy, currentWeeklyRate = state.rateRestructureApplied || state.debtRatePlanWeeksRemaining > 0 ? costPolicy.restructuredWeeklyInterestRate : costPolicy.weeklyInterestRate;
+    const currentWeeklyRate = state.rateRestructureApplied || state.debtRatePlanWeeksRemaining > 0 ? costPolicy.restructuredWeeklyInterestRate : costPolicy.weeklyInterestRate;
     const costNote = state.interestGraceApplied ? '九哥协商宽限已生效：本期周利息暂停一次，其他费用照常结算。' : `${state.rateRestructureApplied ? `九哥降息协议本期按 ${(currentWeeklyRate * 100).toFixed(2)}% 计息；` : state.debtRatePlanWeeksRemaining > 0 ? `九哥降息协议剩余 ${state.debtRatePlanWeeksRemaining} 次周结，利率 ${(currentWeeklyRate * 100).toFixed(2)}%；` : ''}${state.periodicSettlementDue ? '本日为周结日。' : ''}每 ${costPolicy.intervalDays} 天结算：负债按 ${(currentWeeklyRate * 100).toFixed(2)}% 计周利息；房租 ¥${costPolicy.rent * state.chapter.fixedCostMultiplier}、会员 ¥${costPolicy.membership * state.chapter.fixedCostMultiplier}、设备 ¥${costPolicy.equipment * state.chapter.fixedCostMultiplier}${state.chapter.fixedCostMultiplier > 1 ? `（第${state.chapter.number}章经营开支 ×${state.chapter.fixedCostMultiplier}）` : ''}；直播流水分成 ${(costPolicy.streamPlatformShareRate * 100).toFixed(0)}%。利息计入负债，固定费用现金不足部分转入负债。`;
     const chapterStatus = state.chapter.number > 1
       ? `<section class="ns-chapter-status" aria-label="章节与经营成本"><strong>第${state.chapter.number}章 · ${state.chapter.title}</strong><div>${state.chapter.endDay ? `第 ${state.chapter.startDay}–${state.chapter.endDay} 天` : `第 ${state.chapter.startDay} 天起`} · 每 ${costPolicy.intervalDays} 天固定经营开支 ¥${((costPolicy.rent + costPolicy.membership + costPolicy.equipment) * state.chapter.fixedCostMultiplier).toLocaleString()}。利息按当前协议计算，直播分成规则不变。</div></section>`

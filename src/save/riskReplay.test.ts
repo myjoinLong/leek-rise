@@ -21,7 +21,7 @@ describe('risk replay save compatibility', () => {
 
   it('round trips entry, all decisions, result and return without duplicate energy or cash changes', async () => {
     let state = gameReducer({ ...createInitialState(), phase: 'DAYTIME' }, { type: 'START_RISK_REPLAY' });
-    expect(saveVersion).toBe(27);
+    expect(saveVersion).toBe(28);
     for (const allocation of [25, 100, 0, null]) {
       await saveGame(state);
       const restored = await loadSavedGame();

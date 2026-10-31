@@ -1,17 +1,19 @@
-import type { ActiveActivityState, GameState, NpcActivityMemory } from './types';
+import type { ActiveActivityState, GameState, NpcActivityMemory, NpcActivityMemoryEntry } from './types';
 import { activityContracts } from './activityContracts';
 import { traceCompletedActivity } from './npcActivityTrace';
+import { npcIds } from './npcCatalog';
 
 export const npcMemoryTraceLimit = 8;
 
 export function createEmptyNpcActivityMemory(): NpcActivityMemory {
-  const createEntry = () => ({ completedRuns: 0, lastCompletedDay: null, lastTrace: null, recentTraces: [] });
-  return {
-    jiuge: createEntry(), longge: createEntry(), chen: createEntry(), bodhisattva: createEntry(),
-    xiaolian: createEntry(), sujie: createEntry(), zhou: createEntry(), wang: createEntry(),
-    laoliang: createEntry(), sweeper: createEntry(), delivery: createEntry(), zheng: createEntry(),
-    phoneflip: createEntry(),
-  };
+  const createEntry = (): NpcActivityMemoryEntry => ({
+    completedRuns: 0,
+    lastCompletedDay: null,
+    lastTrace: null,
+    recentTraces: [],
+  });
+  const entries = npcIds.map((npcId) => [npcId, createEntry()] as const);
+  return Object.fromEntries(entries) as NpcActivityMemory;
 }
 
 export function npcMemoryFromLegacyActivity(activity: ActiveActivityState | null): NpcActivityMemory {

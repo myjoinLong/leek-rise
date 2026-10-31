@@ -3,13 +3,12 @@ import type { BrokerContractReview } from './brokerNegotiationTypes';
 import type { FactoryReturnContext } from './factoryShiftTypes';
 import type { PhoneFlipReturnContext } from './phoneFlipTypes';
 import type { LaoLiangReturnContext } from './marketStallTypes';
+import type { ActiveActivityState } from './types';
+import type { NpcId } from './npcCatalog';
 
-export type NpcId = 'jiuge' | 'longge' | 'chen' | 'bodhisattva' | 'xiaolian' | 'sujie' | 'zhou' | 'wang' | 'laoliang' | 'sweeper' | 'delivery' | 'zheng' | 'phoneflip';
+export type { NpcId } from './npcCatalog';
 
-export type NpcActivityId =
-  | 'WANG_DELIVERY' | 'LONGGE_CHAT' | 'XIAOLIAN_STREAM' | 'CHEN_DOSSIER' | 'JIUGE_NEGOTIATION'
-  | 'WANG_FACTORY' | 'BODHISATTVA_CHART_LESSON' | 'SUJIE_CAFE_SHIFT' | 'SWEEPER_RISK_REPLAY'
-  | 'LAOLIANG_MARKET_STALL' | 'ZHOU_BROKER_NEGOTIATION' | 'ZHENG_BIKE_REPAIR' | 'PHONE_FLIP';
+export type NpcActivityId = ActiveActivityState['id'];
 
 export interface NpcActivityMemoryTrace {
   day?: number;

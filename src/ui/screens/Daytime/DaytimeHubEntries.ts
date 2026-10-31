@@ -29,9 +29,7 @@ export interface HubEntryPresentation {
   primaryDisabled: boolean;
 }
 
-export interface HubEntry {
-  id: EntryId;
-  activityId?: ActivityId;
+interface HubEntryBase {
   name: string;
   place: string;
   x: number;
@@ -41,6 +39,19 @@ export interface HubEntry {
   line: string;
   getPresentation: (state: GameState) => HubEntryPresentation;
   getDialogue: (state: GameState) => string;
+}
+
+export type HubEntry = {
+  [Id in ActivityId]: HubEntryBase & {
+    id: (typeof activityContracts)[Id]['npcId'];
+    activityId: Id;
+  };
+}[ActivityId];
+
+function registerHubEntries<const Entries extends readonly HubEntry[]>(
+  value: Entries & (Exclude<ActivityId, Entries[number]['activityId']> extends never ? unknown : never),
+): Entries {
+  return value;
 }
 
 const cafeShiftMaximumIncome = cafeShiftBasePay + cafeShiftOrders * cafeShiftTipPerCorrectOrder;
@@ -116,7 +127,7 @@ function phoneFlipDialogue(state: GameState): string {
   return `“${lot.sellerName}带来${lot.name}：${lot.sellerLine}${lot.clue}卖家着急有卖家的原因，别把他的说法当检测结果；验机后再算整备和转售价。”`;
 }
 
-export const entries: HubEntry[] = [
+export const entries = registerHubEntries([
   { id: 'chen', activityId: 'CHEN_DOSSIER', name: '陈总', place: '写字楼', x: 65, y: 16, palette: '#47434b|#273e59|#292f3b', prompt: '查资料', line: '“路演稿写得漂亮不算数。去核对合同、供货和回款，再决定信不信。”', getPresentation: (s) => {
     const visited = s.chenVisitedToday;
     const lowEnergy = s.energy < minimumDossierEnergy;
@@ -222,7 +233,7 @@ export const entries: HubEntry[] = [
     const offers = phoneLotPriceRangeFor(s.day, s.scenarioSeed, 4);
     return { prompt: worked ? '✓' : lowEnergy ? '精力不足' : '验机', label: worked ? '今日已工作' : '阿浩', nodeDisabled: worked || lowEnergy, primaryLabel: worked ? '今天已经完成工作' : '进入三台旧机回收 · 报价 ¥' + offers.minimumOffer + '–¥' + offers.maximumOffer + ' · 未验机整备需另留最多 ¥' + phoneFlipPolicy.maxUninspectedRepairReserve + ' · 验机 ' + phoneFlipPolicy.inspectEnergy + ' 精力/台，至少精力 ' + phoneFlipPolicy.minimumEnergy, primaryAction: activityContracts.PHONE_FLIP.startAction, primaryDisabled: worked || lowEnergy };
   }, getDialogue: phoneFlipDialogue },
-];
+]);
 
 interface SpriteDetail {
   mark: string;
