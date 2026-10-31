@@ -143,6 +143,7 @@ export function createInitialState(seed = 4): GameState {
     fame: 0,
     streamedToday: false,
     gender: null,
+    codename: '盘城新客',
     leechLevel: 100,
     activeActivity: null,
     marketIntel: null,

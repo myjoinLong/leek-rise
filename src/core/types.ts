@@ -174,6 +174,7 @@ export interface GameState {
   fame: number;
   streamedToday: boolean;
   gender: PlayerGender | null;
+  codename: string;
   energyMax: number;
   leechLevel: number;
   activeActivity: ActiveActivityState | null;

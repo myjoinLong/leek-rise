@@ -157,7 +157,7 @@ const render = async (currentState: GameState): Promise<void> => {
       const { createStartScreen } = await import('./ui/screens/Start/StartScreen');
       screen = createStartScreen(dispatch, {
         save: showStartMenu && resumableSave
-          ? { day: resumableSave.day, cash: resumableSave.cash, debt: resumableSave.debt }
+          ? { day: resumableSave.day, cash: resumableSave.cash, debt: resumableSave.debt, codename: resumableSave.codename }
           : null,
         onContinue: () => {
           if (!resumableSave) return;
@@ -165,11 +165,11 @@ const render = async (currentState: GameState): Promise<void> => {
           showStartMenu = false;
           void render(state);
         },
-        onStartNewGame: (gender) => {
+        onStartNewGame: (gender, codename) => {
           state = createInitialState(createCampaignSeed());
           resumableSave = null;
           showStartMenu = false;
-          dispatch({ type: 'SELECT_CHARACTER', gender });
+          dispatch({ type: 'SELECT_CHARACTER', gender, codename });
         },
       });
     } else {

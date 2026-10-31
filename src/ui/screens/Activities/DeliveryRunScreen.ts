@@ -57,6 +57,48 @@ function renderResult(state: GameState): string {
     '<button class="dr-return" type="button" data-action="return">回到盘城街区</button></section>';
 }
 
+function renderRouteMap(stopIndex: number, complete: boolean): string {
+  const stops = [
+    { x: 42, y: 20, label: '驿站' },
+    { x: 130, y: 45, label: '1' },
+    { x: 130, y: 130, label: '2' },
+    { x: 320, y: 65, label: '3' },
+  ] as const;
+  const completedStops = complete ? 3 : Math.min(stopIndex, 3);
+  const currentTarget = complete || stopIndex >= 3 ? -1 : stopIndex + 1;
+  const rider = stops[Math.min(stopIndex, 3)]!;
+  const routeSegments = [
+    'M42 20L130 45',
+    'M130 45L130 130',
+    'M130 130L250 130L250 65L320 65',
+  ];
+  const routes = routeSegments.map((path, index) => {
+    const isComplete = index < completedStops;
+    const isCurrent = index === stopIndex && !complete;
+    return '<path class="dr-route-segment' + (isComplete ? ' is-complete' : isCurrent ? ' is-current' : '') + '" d="' + path + '" />';
+  }).join('');
+  const markers = stops.map((stop, index) => {
+    const isDone = index > 0 && index <= completedStops;
+    const isCurrent = index === currentTarget;
+    const markerClass = isDone ? 'is-done' : isCurrent ? 'is-current' : index === 0 ? 'is-depot' : 'is-future';
+    const label = index === 0 ? '站' : isDone ? '✓' : String(index);
+    return '<g class="dr-node ' + markerClass + '" transform="translate(' + stop.x + ' ' + stop.y + ')" aria-hidden="true">' +
+      '<circle r="10" /><text y="3.5">' + label + '</text>' +
+      '<text class="dr-node-name" y="23">' + stop.label + '</text></g>';
+  }).join('');
+  const progressLabel = complete
+    ? '三单全部送达，路线完成'
+    : '已完成 ' + completedStops + ' 单，当前目标第 ' + (stopIndex + 1) + ' 单';
+  const riderPosition = 'translate(' + (rider.x - 13) + ' ' + (rider.y - 13) + ')';
+
+  return '<svg viewBox="0 0 360 180" role="img" aria-label="' + progressLabel + '">' +
+    '<path d="M0 45H130V130H250V65H360M42 0V45M130 45H250M250 65V180M75 130V180" fill="none" stroke="#7c8b83" stroke-width="28" />' +
+    '<rect x="18" y="13" width="46" height="18" fill="#bb6948" /><rect x="104" y="54" width="50" height="34" fill="#d6ac61" />' +
+    '<rect x="210" y="95" width="48" height="30" fill="#668e71" /><rect x="294" y="44" width="48" height="34" fill="#ad7352" />' +
+    routes + markers +
+    '<g class="dr-rider" transform="' + riderPosition + '" aria-hidden="true"><circle r="7" /><text y="3">你</text></g></svg>';
+}
+
 export function createDeliveryRunScreen(
   initialState: GameState,
   dispatch: (action: GameAction) => GameState,
@@ -74,7 +116,8 @@ export function createDeliveryRunScreen(
     '.dr-courier{position:absolute;z-index:3;top:calc(var(--safe-top) + 84px);left:7%;pointer-events:none}.dr-courier-sprite{display:block;width:auto;height:clamp(132px,38vw,164px);object-fit:contain;object-position:center bottom;image-rendering:pixelated;filter:drop-shadow(2px 2px 0 #151515)}',
     '.dr-dispatcher{position:absolute;z-index:2;top:calc(var(--safe-top) + 15%);right:13%;display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px;border:1px solid #d4bd78;background:rgba(25,34,38,.88);box-shadow:3px 3px #000;color:#fff0d2;font-size:9px;pointer-events:none}.dr-dispatcher-sprite{display:block;width:44px;height:58px;background:url("/art/delivery-dispatcher-character-v1.webp") center/contain no-repeat;image-rendering:pixelated;filter:drop-shadow(2px 2px 0 #151515)}',
     '.dr-map{position:absolute;z-index:2;top:31%;right:18px;left:18px;height:18%;min-height:150px;border:3px solid #e4ca78;background:rgba(24,41,48,.89);box-shadow:5px 5px #000}',
-    '.dr-map svg{width:100%;height:100%}.dr-pin{fill:#ffde70;stroke:#332d20;stroke-width:3}.dr-route-line{fill:none;stroke:#f8df89;stroke-width:5;stroke-dasharray:8 6}',
+    '.dr-map svg{width:100%;height:100%}.dr-route-segment{fill:none;stroke:#83908a;stroke-width:4;stroke-dasharray:5 6;opacity:.75}.dr-route-segment.is-current{stroke:#ffdf76;stroke-width:5;opacity:1}.dr-route-segment.is-complete{stroke:#ffdf76;stroke-width:5;stroke-dasharray:none;opacity:1}',
+    '.dr-node circle{fill:#46514d;stroke:#e5dcc1;stroke-width:2}.dr-node text{fill:#fff4d2;font-size:8px;text-anchor:middle;font-weight:bold}.dr-node.is-done circle{fill:#75b779;stroke:#173c2a}.dr-node.is-current circle{fill:#ffdf76;stroke:#4a3914;stroke-width:3}.dr-node.is-depot circle{fill:#80908b}.dr-node-name{fill:#fff3cc!important;font-size:7px!important;font-weight:normal!important}.dr-rider circle{fill:#ec684f;stroke:#211f1c;stroke-width:2}.dr-rider text{fill:#fff;font-size:7px;text-anchor:middle;font-weight:bold}',
     '.dr-order{position:absolute;z-index:3;right:12px;bottom:calc(var(--safe-bottom) + 10px);left:12px;max-height:52%;overflow-y:auto;padding:12px;border:3px solid #e4ca78;background:rgba(29,34,38,.97);box-shadow:5px 5px #000}',
     '.dr-progress{display:flex;justify-content:space-between;gap:8px;color:#d7cfae;font-size:10px}.dr-order h2,.dr-result h2{margin:8px 0;color:#ffe28a;font-size:17px}',
     '.dr-briefing{color:#e9e2d1;font-size:12px;line-height:1.5}.dr-prompt{margin:8px 0 6px;color:#f2cf79;font-size:11px}',
@@ -94,14 +137,7 @@ export function createDeliveryRunScreen(
     '<header class="dr-header"><p class="dr-kicker">王总的临时单 · 支线副本</p><h1 class="dr-title">外卖跑单</h1><p class="dr-stats"></p></header>',
     '<span class="dr-courier" aria-hidden="true"><img class="dr-courier-sprite" alt=""></span>',
     '<span class="dr-dispatcher" aria-hidden="true"><span class="dr-dispatcher-sprite"></span><b>调度员</b></span>',
-    '<div class="dr-map" role="img" aria-label="本轮配送路线示意图"><svg viewBox="0 0 360 180" aria-hidden="true">',
-    '<path d="M0 45H130V130H250V65H360M42 0V45M130 45H250M250 65V180M75 130V180" fill="none" stroke="#7c8b83" stroke-width="28"/>',
-    '<path class="dr-route-line" d="M42 20L130 45L130 130L250 130L250 65L320 65"/>',
-    '<rect x="18" y="13" width="46" height="18" fill="#bb6948"/><rect x="104" y="54" width="50" height="34" fill="#d6ac61"/>',
-    '<rect x="210" y="95" width="48" height="30" fill="#668e71"/><rect x="294" y="44" width="48" height="34" fill="#ad7352"/>',
-    '<circle class="dr-pin" cx="42" cy="20" r="9"/><circle class="dr-pin" cx="320" cy="65" r="9"/>',
-    '<text x="18" y="8" fill="#fff3cc" font-size="10">驿站</text><text x="283" y="95" fill="#fff3cc" font-size="10">送达点</text>',
-    '</svg></div>',
+    '<div class="dr-map"></div>',
     '<section class="dr-content" aria-live="polite"></section>',
   ].join('');
 
@@ -116,9 +152,11 @@ export function createDeliveryRunScreen(
     if (courier.getAttribute('src') !== courierImage) courier.src = courierImage;
     const run = state.activeActivity;
     if (!run || run.id !== 'WANG_DELIVERY') {
+      screen.querySelector<HTMLElement>('.dr-map')!.replaceChildren();
       content.innerHTML = '<section class="dr-result"><h2>跑单记录已结束</h2><button class="dr-return" type="button" data-action="return">回到盘城街区</button></section>';
       return;
     }
+    screen.querySelector<HTMLElement>('.dr-map')!.innerHTML = renderRouteMap(run.stopIndex, run.status === 'RESULT');
     stats.textContent = '第 ' + run.day + ' 天 · 精力 ' + state.energy + '/' + state.energyMax;
     const stops = deliveryStopsFor(run.day, run.scenarioVersion ?? 1, run.scenarioSeed ?? 4, run.returnContext ?? null);
     content.innerHTML = run.status === 'RESULT'

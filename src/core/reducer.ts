@@ -13,7 +13,7 @@ import type { BrokerNegotiationAction, CafeShiftAction, ChartLessonAction, Compa
 export type GameAction = import('./marketStallTypes').LaoLiangStallAction | RiskReplayAction | DebtInstallmentAction | CafeShiftAction | ChartLessonAction | { type: 'ADVANCE_TICK' }
   | { type: 'ADVANCE_TICKS'; count: number; stockIds?: readonly string[] }
   | { type: 'ADVANCE_PHASE' }
-  | { type: 'SELECT_CHARACTER'; gender: PlayerGender }
+  | { type: 'SELECT_CHARACTER'; gender: PlayerGender; codename?: string }
   | { type: 'CHANGE_PHASE'; phase: GamePhase }
   | { type: 'SELECT_STOCK'; stockId: string }
   | { type: 'SET_INPUT_SHARES'; shares: number }
@@ -132,7 +132,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'SELECT_CHARACTER': {
       const energyMax = action.gender === 'MALE' ? 120 : 100;
       const fame = action.gender === 'FEMALE' ? 30 : 15;
-      return { ...state, gender: action.gender, energy: energyMax, energyMax, fame, phase: 'PRE_MARKET' };
+      const codename = [...(action.codename?.trim() || state.codename || '盘城新客')].slice(0, 12).join('');
+      return { ...state, gender: action.gender, codename, energy: energyMax, energyMax, fame, phase: 'PRE_MARKET' };
     }
     case 'SELECT_STOCK':
       return state.stocks[action.stockId] ? { ...state, selectedStockId: action.stockId } : state;

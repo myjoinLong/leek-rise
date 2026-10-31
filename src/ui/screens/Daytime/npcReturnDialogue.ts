@@ -57,9 +57,9 @@ const returnVoices: Record<NpcId, Record<RelationshipStage, ReturnVoice>> = {
     regular: (visit, count) => `扫地僧沉默了一会儿：“${visit}你又来了，第${count}回。爆仓那天我记得太清楚，后来才学会把屏幕关掉。”`,
   },
   delivery: {
-    recognized: (visit, count) => `调度员点开新订单：“${visit}你来过，这是第${count}回。路线会变，先看距离和报酬再出发。”`,
-    familiar: (visit, count) => `调度员指着排班表：“${visit}你来过${count}回了。平台盯准时率，我先把时限和绕路风险摆明。”`,
-    regular: (visit, count) => `调度员靠着柜台：“${visit}你又来了，第${count}回。急单不是顺路，晚一分钟也不该只算骑手的错。”`,
+    recognized: (visit, count) => `调度员把排班表推给你：“${visit}你来过，这是第${count}回。平台只考核准时率，绕路和疲劳也得算进成本。”`,
+    familiar: (visit, count) => `调度员指着排班表：“${visit}你来过${count}回了。平台盯准时率，我先把时限和精力成本写清。”`,
+    regular: (visit, count) => `调度员靠着柜台：“${visit}你又来了，第${count}回。急单加价不等于顺路，时间和体力都得算进账。”`,
   },
   zheng: {
     recognized: (visit, count) => `郑师傅擦着扳手：“${visit}你来过，这是第${count}回。机器响不等于零件坏，先测清楚再拆。”`,
@@ -101,7 +101,7 @@ export function dialogueForEntry(entry: HubEntry, state: GameState): string {
   const memory = state.npcActivityMemory[entry.id];
   if (memory.completedRuns <= 0) return base;
   const stage = relationshipStage(memory.completedRuns);
-  const returnVoice = returnVoices[entry.id][stage](describeVisit(memory), memory.completedRuns);
+  const returnVoice = returnVoices[entry.id][stage](describeVisit(memory), memory.completedRuns + 1);
   const traces = memory.recentTraces.length > 0
     ? memory.recentTraces
     : memory.lastTrace ? [memory.lastTrace] : [];

@@ -7,7 +7,7 @@ import { marketTicksPerDay } from '../core/timeRules';
 import { createEmptyNpcActivityMemory, npcMemoryTraceLimit } from '../core/npcActivityMemory';
 import { factoryReturnContextSchema } from './factoryShiftSchema';
 
-export const saveVersion = 27;
+export const saveVersion = 28;
 
 const npcActivityMemoryTraceSchema = z.object({
   day: z.number().int().positive().optional(),
@@ -93,6 +93,7 @@ export const gameStateSchema = z.object({
   fame: z.number().int().min(0).max(100),
   streamedToday: z.boolean(),
   gender: z.enum(['MALE', 'FEMALE']).nullable(),
+  codename: z.string().trim().min(1).max(12).default('盘城新客'),
   energyMax: z.number(),
   leechLevel: z.number(),
   activeActivity: activitySchema.nullable(),
@@ -204,5 +205,6 @@ export const saveEnvelopeSchema = z.discriminatedUnion('version', [
   z.object({ version: z.literal(24), savedAt: z.number(), state: gameStateSchema }),
   z.object({ version: z.literal(25), savedAt: z.number(), state: gameStateSchema }),
   z.object({ version: z.literal(26), savedAt: z.number(), state: gameStateSchema }),
+  z.object({ version: z.literal(27), savedAt: z.number(), state: gameStateSchema }),
   z.object({ version: z.literal(saveVersion), savedAt: z.number(), state: gameStateSchema }),
 ]);

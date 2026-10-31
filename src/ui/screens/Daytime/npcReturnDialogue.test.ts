@@ -79,6 +79,26 @@ describe('NPC return dialogue', () => {
     }
   });
 
+  it('counts the current visit and keeps the delivery callback focused on new information', () => {
+    const state = createInitialState();
+    const delivery = entries.find((entry) => entry.id === 'delivery');
+    if (!delivery) throw new Error('Missing delivery street entry.');
+
+    for (const [completedRuns, currentVisit] of [[1, '第2回'], [3, '来过4回了'], [6, '第7回']] as const) {
+      state.npcActivityMemory.delivery = {
+        completedRuns,
+        lastCompletedDay: 1,
+        lastTrace: memoryTraces.delivery,
+        recentTraces: [memoryTraces.delivery],
+      };
+      const dialogue = dialogueForEntry(delivery, state);
+
+      expect(dialogue).toContain(currentVisit);
+      expect(dialogue).not.toContain('路线会变');
+      expect(dialogue).toContain('上回路线');
+    }
+  });
+
   it('lets Longge remember the player\'s last recorded conclusion without grading it as correct', () => {
     const state = createInitialState();
     const longge = entries.find((entry) => entry.id === 'longge');

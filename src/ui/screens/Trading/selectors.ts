@@ -52,6 +52,14 @@ export function selectTradingVM(state: GameState, leverage = 1): TradingVM {
   const maxShares = selected
     ? maxAffordableBuyShares(state.cash, selected, leverage, getBrokerTradingFeeRate(state.brokerContract, state.day))
     : 0;
+  const validLot = Number.isInteger(state.inputShares)
+    && state.inputShares >= 100
+    && state.inputShares % 100 === 0;
+  const inputError = !validLot
+    ? '数量必须是100股的正整数倍'
+    : state.inputShares > maxShares
+      ? `买入资金不足，当前盘口最多可买 ${maxShares.toLocaleString()} 股`
+      : null;
 
   return {
     day: state.day,
@@ -66,7 +74,7 @@ export function selectTradingVM(state: GameState, leverage = 1): TradingVM {
     leverageAvailable: false,
     leverageOn: false,
     inputShares: state.inputShares,
-    inputError: null,
+    inputError,
     lastOrder: null,
   };
 }

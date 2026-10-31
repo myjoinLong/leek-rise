@@ -82,6 +82,10 @@
 .ofc-warning {
   color: var(--danger);
 }
+.ofc-slip-note {
+  color: var(--text-weak);
+  font-size: var(--fs-tiny);
+}
 .ofc-latency {
   color: var(--text-weak);
   font-size: var(--fs-tiny);

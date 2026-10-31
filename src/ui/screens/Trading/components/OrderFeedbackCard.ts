@@ -21,7 +21,7 @@ function escapeHtml(value: string): string {
 }
 
 export interface SlippagePresentation {
-  showPriceComparison: boolean;
+  slippageText: string;
   warningText: string | null;
 }
 
@@ -31,7 +31,7 @@ export function getSlippagePresentation(slippagePct: number, side: OrderFeedback
     ? `⚠ ${side === 'BUY' ? '+' : '-'}${(absoluteSlippage * 100).toFixed(1)}%`
     : null;
   return {
-    showPriceComparison: absoluteSlippage >= 0.001,
+    slippageText: `滑点 ${side === 'BUY' ? '+' : '-'}${(absoluteSlippage * 100).toFixed(2)}%`,
     warningText,
   };
 }
@@ -170,12 +170,9 @@ export class OrderFeedbackCard implements Component<OrderFeedback> {
 
   private renderFilledRows(): string {
     const slippage = getSlippagePresentation(this.state.slippagePct, this.state.side);
-    const priceRow = slippage.showPriceComparison
-      ? `委托价 ${this.state.requestedPrice.toFixed(2)} → 成交价 ${this.state.filledPrice.toFixed(2)}`
-      : `成交价 ${this.state.filledPrice.toFixed(2)}`;
     const warning = slippage.warningText
       ? `<span class="ofc-warning">${slippage.warningText}</span>`
-      : '';
+      : `<span class="ofc-slip-note">${slippage.slippageText}</span>`;
     const remaining = this.state.result === 'PARTIAL'
       ? `<div class="ofc-row ofc-remaining">剩余 ${this.state.requestedShares - this.state.filledShares} 股未成交，已自动撤单</div>`
       : '';
@@ -184,7 +181,7 @@ export class OrderFeedbackCard implements Component<OrderFeedback> {
       : '';
 
     return `
-      <div class="ofc-row ofc-price-line">${priceRow} ${warning}</div>
+      <div class="ofc-row ofc-price-line">委托价 ${this.state.requestedPrice.toFixed(2)} → 成交价 ${this.state.filledPrice.toFixed(2)} ${warning}</div>
       ${remaining}
       <div class="ofc-row">交易费用 ¥${this.state.fee.toFixed(2)}</div>
       <div class="ofc-row">到账后现金 ¥${this.state.cashAfter.toLocaleString()}</div>

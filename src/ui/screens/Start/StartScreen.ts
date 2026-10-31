@@ -2,9 +2,9 @@ import type { GameAction } from '../../../core/reducer';
 import type { GameState, PlayerGender } from '../../../core/types';
 
 export interface StartScreenOptions {
-  save: Pick<GameState, 'day' | 'cash' | 'debt'> | null;
+  save: Pick<GameState, 'day' | 'cash' | 'debt' | 'codename'> | null;
   onContinue: () => void;
-  onStartNewGame: (gender: PlayerGender) => void;
+  onStartNewGame: (gender: PlayerGender, codename: string) => void;
 }
 
 export function createStartScreen(
@@ -23,6 +23,8 @@ export function createStartScreen(
       .start-title { padding:12px 18px; border:3px solid #f4cc63; background:rgba(42,36,48,.94); box-shadow:6px 6px 0 #000; color:#ffe38c; font-size:clamp(32px,10vw,52px); line-height:1.15; text-align:center; text-shadow:3px 3px #7b382d; }
       .start-subtitle { padding:0 8px; color:#f1eadc; font-size:13px; line-height:1.5; text-align:center; text-shadow:2px 2px #171923; }
       .start-roles { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; width:min(100%,calc(100vw - 36px),440px); min-width:0; }
+      .start-codename { box-sizing:border-box; width:min(100%,calc(100vw - 36px),440px); min-height:48px; padding:10px 12px; border:2px solid #aaa58f; background:#171b22; color:var(--text-primary); font:16px 'Courier New',monospace; }
+      .start-codename-label { display:grid; gap:6px; width:min(100%,calc(100vw - 36px),440px); color:#d7d1c3; font-size:12px; }
       .start-role { display:flex; min-width:0; min-height:230px; flex-direction:column; align-items:center; justify-content:center; gap:9px; padding:14px 8px; border:2px solid #aaa58f; border-radius:0; background:rgba(30,34,42,.92); box-shadow:4px 4px 0 #000; color:var(--text-primary); font:inherit; text-align:center; cursor:pointer; }
       .start-role[aria-pressed="true"] { border-color:#ffe178; background:rgba(65,64,47,.96); box-shadow:4px 4px 0 #a96e35; }
       .start-avatar { display:block; width:112px; height:136px; border:2px solid #d6c58f; background:rgba(16,21,25,.58); object-fit:contain; image-rendering:pixelated; }
@@ -31,6 +33,7 @@ export function createStartScreen(
       .start-enter { width:min(100%,calc(100vw - 36px),440px); min-height:56px; border:3px solid #ffe178; border-radius:0; background:#a94d3d; box-shadow:5px 5px 0 #000; color:#fff4d5; font: bold 19px 'Courier New',monospace; cursor:pointer; }
       .start-enter:disabled { border-color:#777b83; background:#343744; box-shadow:3px 3px 0 #000; color:#bec1c9; cursor:not-allowed; }
       .start-save-menu, .start-new-game { width:min(100%,calc(100vw - 36px),440px); }
+      .start-new-game { display:flex; flex-direction:column; align-items:center; gap:10px; }
       .start-save-menu { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; min-width:0; }
       .start-save-menu[hidden], .start-new-game[hidden], .start-back[hidden] { display:none; }
       .start-save-card { display:flex; min-width:0; min-height:150px; flex-direction:column; align-items:center; justify-content:center; gap:9px; padding:14px 10px; border:2px solid #aaa58f; background:rgba(30,34,42,.94); box-shadow:4px 4px 0 #000; color:var(--text-primary); font:inherit; text-align:center; cursor:pointer; }
@@ -55,13 +58,13 @@ export function createStartScreen(
     <header class="start-brand">
       <span class="start-kicker">盘城街区 · 人生开盘</span>
       <h1 class="start-title">韭菜翻身</h1>
-      <p class="start-subtitle">选好你的身份，再进盘城讨生活。</p>
+      <p class="start-subtitle">十次交易，九次反向；剩下一次，手续费。</p>
     </header>
     ${options.save ? `
       <div class="start-save-menu" role="group" aria-label="选择存档操作">
         <button class="start-save-card" type="button" data-start-choice="continue">
           <span class="start-save-title">重操旧业</span>
-          <span class="start-save-detail">第 ${options.save.day} 天<br>现金 ¥${Math.floor(options.save.cash).toLocaleString('zh-CN')} · 负债 ¥${Math.floor(options.save.debt).toLocaleString('zh-CN')}</span>
+          <span class="start-save-detail">${options.save.codename} · 第 ${options.save.day} 天<br>现金 ¥${Math.floor(options.save.cash).toLocaleString('zh-CN')} · 负债 ¥${Math.floor(options.save.debt).toLocaleString('zh-CN')}</span>
         </button>
         <button class="start-save-card start-save-card--new" type="button" data-start-choice="new">
           <span class="start-save-title">新生入场</span>
@@ -70,6 +73,9 @@ export function createStartScreen(
       </div>
     ` : ''}
     <section class="start-new-game" ${options.save ? 'hidden' : ''} aria-label="新游戏设置">
+      <label class="start-codename-label">给自己起个代号
+        <input class="start-codename" type="text" maxlength="12" autocomplete="nickname" placeholder="最多 12 个字" aria-label="玩家代号">
+      </label>
       <div class="start-roles" role="group" aria-label="选择角色">
         <button class="start-role" type="button" data-gender="MALE" aria-pressed="false">
           <img class="start-avatar start-avatar--rider" src="/art/player-courier-male-v1.png" alt="" aria-hidden="true">
@@ -90,6 +96,11 @@ export function createStartScreen(
   `;
 
   const enterButton = screen.querySelector<HTMLButtonElement>('.start-enter')!;
+  const codenameInput = screen.querySelector<HTMLInputElement>('.start-codename')!;
+  const syncEnterButton = (): void => {
+    enterButton.disabled = selectedGender === null || codenameInput.value.trim().length === 0;
+  };
+  codenameInput.addEventListener('input', syncEnterButton);
   screen.addEventListener('click', (event: MouseEvent) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
@@ -101,7 +112,7 @@ export function createStartScreen(
       screen.querySelectorAll<HTMLButtonElement>('[data-gender]').forEach((button) => {
         button.setAttribute('aria-pressed', String(button === roleButton));
       });
-      enterButton.disabled = false;
+      syncEnterButton();
       return;
     }
     if (target.closest('[data-start-choice="continue"]')) {
@@ -119,15 +130,17 @@ export function createStartScreen(
     if (target.closest('.start-back') && options.save) {
       choosingNewGame = false;
       selectedGender = null;
+      codenameInput.value = '';
       screen.querySelector<HTMLElement>('.start-save-menu')?.removeAttribute('hidden');
       screen.querySelector<HTMLElement>('.start-new-game')?.setAttribute('hidden', '');
       screen.querySelector<HTMLElement>('.start-back')?.setAttribute('hidden', '');
-      enterButton.disabled = true;
+      syncEnterButton();
       return;
     }
-    if (target.closest('.start-enter') && selectedGender) {
-      if (choosingNewGame) options.onStartNewGame(selectedGender);
-      else dispatch({ type: 'SELECT_CHARACTER', gender: selectedGender });
+    if (target.closest('.start-enter') && selectedGender && codenameInput.value.trim()) {
+      const codename = [...codenameInput.value.trim()].slice(0, 12).join('');
+      if (choosingNewGame) options.onStartNewGame(selectedGender, codename);
+      else dispatch({ type: 'SELECT_CHARACTER', gender: selectedGender, codename });
     }
   });
   return screen;

@@ -23,7 +23,6 @@ export function createTradingScreen(
 ): HTMLElement {
   let gameState = initialState;
   let leverageOn = false;
-  let inputError: string | null = null;
   let feedbackCard: OrderFeedbackCard | null = null;
   let displayedFeedbackId: string | null = null;
   let chart: PriceChartInstance | null = null;
@@ -93,10 +92,6 @@ export function createTradingScreen(
     marketClockLabel.textContent = `行情 ${tickCount}/${marketTicksPerDay} Tick`;
     marketClockFill.style.transform = `scaleX(${tickCount / marketTicksPerDay})`;
     const selectedStock = gameState.stocks[gameState.selectedStockId];
-    const validLot = Number.isInteger(gameState.inputShares)
-      && gameState.inputShares >= 100
-      && gameState.inputShares % 100 === 0;
-    inputError = validLot ? null : '数量必须是100股的正整数倍';
     const orderEstimates = selectedStock ? {
       buy: estimateOrderSettlement(selectedStock, 'BUY', gameState.inputShares, leverageOn ? 2 : 1, false, getBrokerTradingFeeRate(gameState.brokerContract, gameState.day)),
       sell: estimateOrderSettlement(selectedStock, 'SELL', gameState.inputShares, leverageOn ? 2 : 1, false, getBrokerTradingFeeRate(gameState.brokerContract, gameState.day)),
@@ -104,7 +99,6 @@ export function createTradingScreen(
     const viewState: TradingVM = {
       ...selected,
       leverageOn,
-      inputError,
       lastOrder: gameState.lastOrderFeedback,
     };
     topBar.update(viewState);
@@ -185,7 +179,6 @@ export function createTradingScreen(
         type: 'SET_INPUT_SHARES',
         shares: Math.floor(vm.maxBuyShares * ratio / 100) * 100,
       });
-      inputError = null;
       render();
     },
     onToggleLeverage: (): void => {
