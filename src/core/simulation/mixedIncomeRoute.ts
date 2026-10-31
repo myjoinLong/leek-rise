@@ -106,10 +106,18 @@ export function simulateMixedIncomeRoute(options: MixedIncomeRouteOptions): Mixe
         dispatch(action);
       }
     }
-    for (let tick = 0; tick < ticksPerDay && state.phase === 'TRADING'; tick += 1) {
-      dispatch({ type: 'ADVANCE_TICK' });
-      if (state.phase !== 'TRADING' || !options.tradingStrategy) continue;
-      const action = tradingAction(state, options.tradingStrategy, tick + 1);
+    let advancedTicks = 0;
+    while (advancedTicks < ticksPerDay && state.phase === 'TRADING') {
+      const untilDecision = options.tradingStrategy ? 5 - (advancedTicks % 5) : ticksPerDay - advancedTicks;
+      const count = Math.min(untilDecision, ticksPerDay - advancedTicks);
+      // Unselected listings without holdings cannot change this simulation's cash, debt, or drawdown.
+      const relevantStockIds = [state.selectedStockId, ...Object.entries(state.stocks)
+        .filter(([, stock]) => (stock.holding?.shares ?? 0) > 0)
+        .map(([id]) => id)];
+      dispatch({ type: 'ADVANCE_TICKS', count, stockIds: relevantStockIds });
+      advancedTicks += count;
+      if (state.phase !== 'TRADING' || !options.tradingStrategy || advancedTicks % 5 !== 0) continue;
+      const action = tradingAction(state, options.tradingStrategy, advancedTicks);
       if (action) dispatch(action);
     }
     if (state.phase === 'TRADING') dispatch({ type: 'ADVANCE_PHASE' });

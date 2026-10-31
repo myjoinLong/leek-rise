@@ -77,15 +77,18 @@ describe('activity registration contract', () => {
       const started = gameReducer(state, contract.startAction);
       expect(started.activeActivity?.id).toBeDefined();
       const actions = [
-        contract.startAction,
         ...contract.allowedActions.map((type) => type === contract.exitAction.type
           ? contract.exitAction
           : actionByType.get(type)),
       ];
+      expect(reduceActivityAction(state, contract.startAction), contract.startAction.type).not.toBeNull();
       for (const action of actions) {
         expect(action, `${contract.startAction.type} routes ${action?.type ?? 'missing sample'}`).toBeDefined();
         if (action) expect(reduceActivityAction(started, action), action.type).not.toBeNull();
       }
+
+      const otherStart = contracts.find((candidate) => candidate.startAction.type !== contract.startAction.type)?.startAction;
+      if (otherStart) expect(reduceActivityAction(started, otherStart), `${contract.startAction.type} rejects ${otherStart.type}`).toBeNull();
     }
   });
 

@@ -49,7 +49,7 @@ describe('factory relationship dialogue', () => {
 
   it('uses the saved missed-check fact without inventing it for incomplete traces', () => {
     expect(factoryRelationshipDialogue([factoryTrace(4, 40)])).toContain('底薪没有扣');
-    expect(factoryRelationshipDialogue([factoryTrace(4, 40)])).toContain('上回有工位没拿到质量奖');
+    expect(factoryRelationshipDialogue([factoryTrace(4, 40)])).toContain('上次漏掉的那项质量奖没拿到');
   });
 
   it('ignores other NPC histories when building Wang’s relationship beat', () => {

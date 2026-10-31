@@ -31,7 +31,9 @@ export async function loadSavedGame(): Promise<GameState | null> {
 
   const result = saveEnvelopeSchema.safeParse(stored);
   if (!result.success) throw new Error('The local save is invalid or uses an unsupported version.');
-  const stocks = mergeStockPool(result.data.state.stocks, result.data.state.scenarioSeed);
+  const stocks = result.data.version === saveVersion
+    ? result.data.state.stocks
+    : mergeStockPool(result.data.state.stocks, result.data.state.scenarioSeed);
   if (result.data.version === 1) {
     return {
       ...result.data.state,

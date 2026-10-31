@@ -71,6 +71,7 @@ export function simulateEconomy(scenario: EconomyScenario): EconomySimulation {
     installmentPeriodsCompleted: 0, contractFees: 0, equityChange: 0, maxDrawdown: 0,
   };
   const dispatch = (action: GameAction): void => {
+    const stateBeforeAction = state;
     const beforeDebt = state.debt;
     const receiptBefore = state.debtInstallmentPlan?.lastReceipt;
     state = gameReducer(state, action);
@@ -83,8 +84,27 @@ export function simulateEconomy(scenario: EconomyScenario): EconomySimulation {
     }
     if (action.type === 'BORROW_FROM_NPC') totals.borrowed = money(totals.borrowed + state.debt - beforeDebt);
     if (action.type === 'REPAY_DEBT') totals.repaid = money(totals.repaid + beforeDebt - state.debt);
-    peak = Math.max(peak, equity(state));
-    totals.maxDrawdown = Math.max(totals.maxDrawdown, money(peak - equity(state)));
+    const updateDrawdown = (currentEquity: number): void => {
+      peak = Math.max(peak, currentEquity);
+      totals.maxDrawdown = Math.max(totals.maxDrawdown, money(peak - currentEquity));
+    };
+    if (action.type === 'ADVANCE_TICKS') {
+      const advancedTicks = Math.max(0, state.marketTicksThisDay - stateBeforeAction.marketTicksThisDay);
+      for (let offset = 0; offset < advancedTicks; offset += 1) {
+        const holdingsValue = Object.entries(stateBeforeAction.stocks).reduce((total, [id, stock]) => {
+          const shares = stock.holding?.shares ?? 0;
+          if (shares === 0) return total;
+          const prices = state.stocks[id]?.priceHistory;
+          const historyIndex = (prices?.length ?? 0) - advancedTicks + offset;
+          return total + shares * (prices?.[historyIndex] ?? state.stocks[id]?.price ?? stock.price);
+        }, 0);
+        const isSettledClose = offset === advancedTicks - 1 && state.phase === 'NIGHT';
+        const balance = isSettledClose ? state.cash - state.debt : stateBeforeAction.cash - stateBeforeAction.debt;
+        updateDrawdown(money(balance + holdingsValue));
+      }
+    } else {
+      updateDrawdown(equity(state));
+    }
   };
   for (let day = 1; day <= scenario.days; day += 1) {
     const dayStart = { equity: equity(state), assetSaleProceeds: 0 };
@@ -197,10 +217,19 @@ export function simulateEconomy(scenario: EconomyScenario): EconomySimulation {
       if (Object.values(state.stocks).some((stock) => stock.holding)) throw new Error('Exit left unsold holdings.');
       dayStart.assetSaleProceeds = money(state.cash - saleStart.cash + state.dailyFees - saleStart.fees);
     }
-    for (let tick = 1; tick <= scenario.ticksPerDay; tick += 1) {
-      dispatch({ type: 'ADVANCE_TICK' });
+    let advancedTicks = 0;
+    const tradesDuringDay = scenario.strategy === 'LOW_FREQUENCY' || scenario.strategy === 'HEAVY';
+    while (advancedTicks < scenario.ticksPerDay && state.phase === 'TRADING') {
+      const untilDecision = tradesDuringDay ? 5 - (advancedTicks % 5) : scenario.ticksPerDay - advancedTicks;
+      const count = Math.min(untilDecision, scenario.ticksPerDay - advancedTicks);
+      // Unselected listings without holdings cannot change this simulation's cash, debt, or drawdown.
+      const relevantStockIds = [state.selectedStockId, ...Object.entries(state.stocks)
+        .filter(([, stock]) => (stock.holding?.shares ?? 0) > 0)
+        .map(([id]) => id)];
+      dispatch({ type: 'ADVANCE_TICKS', count, stockIds: relevantStockIds });
+      advancedTicks += count;
       if (state.phase !== 'TRADING') break;
-      const action = tradingAction(state, scenario.strategy, tick);
+      const action = tradingAction(state, scenario.strategy, advancedTicks);
       if (action && scenario.strategy !== 'EXIT') dispatch(action);
     }
     if (state.phase === 'TRADING') dispatch({ type: 'ADVANCE_PHASE' });

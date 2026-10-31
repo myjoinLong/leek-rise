@@ -3,6 +3,7 @@ import type { GameState } from '../../../core/types';
 import { entries, escapeHtml, type EntryId, type HubEntry, sprite } from './DaytimeHubEntries';
 import { dialogueForEntry } from './npcReturnDialogue';
 import { playNpcIdlePerformance } from './npcIdlePerformance';
+import { MapCameraController } from './mapCamera';
 export function createDaytimeScreen(
   initialState: GameState,
   dispatch: (action: GameAction) => GameState,
@@ -15,23 +16,21 @@ export function createDaytimeScreen(
     '<style>',
     '.dt-screen{position:relative;width:100%;height:100vh;height:100dvh;max-width:480px;margin:0 auto;overflow:hidden;color:#f8efd5;font-family:"Courier New",monospace;container-type:size}',
     '.dt-screen.scene-screen::before{display:none}',
-    '.dt-world-plane{position:absolute;top:50%;left:50%;z-index:1;width:max(100cqw,66.666667cqh);height:max(100cqh,150cqw);transform:translate(-50%,-50%)}',
-    '.dt-world{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}',
+    '.dt-world-plane{position:absolute;top:50%;left:50%;z-index:1;width:max(100cqw,66.666667cqh);height:max(100cqh,150cqw);transform:translate(calc(-50% + var(--dt-pan-x,0px)),calc(-50% + var(--dt-pan-y,0px)));touch-action:none;user-select:none;cursor:grab}',
+    '.dt-world-plane[data-panning="true"]{cursor:grabbing}.dt-world{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;image-rendering:pixelated}',
     '.dt-market-light{position:absolute;inset:0;z-index:1;pointer-events:none;opacity:0}',
     '.dt-screen[data-market-mood="profit"] .dt-market-light{background:radial-gradient(ellipse at 50% 57%,rgba(232,93,74,.62),transparent 72%);opacity:.3}',
     '.dt-screen[data-market-mood="loss"] .dt-market-light{background:radial-gradient(ellipse at 50% 57%,rgba(63,184,122,.56),transparent 72%);opacity:.3}',
     '.dt-hud{position:absolute;z-index:3;top:var(--safe-top);right:10px;left:10px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:5px 10px;padding:8px 10px;border:2px solid #c1aa73;background:rgba(25,29,32,.88);box-shadow:3px 3px 0 #000;font-size:11px}',
     '.dt-crisis{width:100%;color:#ffd07a;font-weight:bold}',
     '.dt-title{width:100%;color:#ffe28a;font-size:16px}.dt-map{position:absolute;inset:0;z-index:2;pointer-events:none}',
-    '.dt-hotspot{position:absolute;display:flex;width:60px;height:72px;min-height:72px;flex-direction:column;align-items:center;justify-content:flex-end;padding:0;transform:translate(-50%,-100%);border:0;background:transparent;color:#fff4d3;font:inherit;text-align:center;text-shadow:2px 2px #171717;cursor:pointer;pointer-events:auto}',
+    '.dt-hotspot{position:absolute;left:var(--entry-x);top:var(--entry-y);display:flex;width:60px;height:72px;min-height:72px;flex-direction:column;align-items:center;justify-content:flex-end;padding:0;transform:translate(-50%,-100%);border:0;background:transparent;color:#fff4d3;font:inherit;text-align:center;text-shadow:2px 2px #171717;cursor:pointer;pointer-events:auto}',
     '.dt-hotspot:focus-visible{outline:2px solid #ffe178;outline-offset:1px}.dt-hotspot:active{transform:translate(-50%,calc(-100% + 2px))}.dt-hotspot:disabled{cursor:default;opacity:.82}',
     '.dt-hotspot[data-entry="longge"]{width:64px;height:104px}',
     '.dt-hotspot[data-entry="jiuge"]{width:64px;height:104px;pointer-events:none}',
     '.dt-hotspot[data-entry="jiuge"] .dt-person,.dt-hotspot[data-entry="jiuge"] .dt-prompt{pointer-events:auto}',
     '.dt-hotspot[data-entry="zheng"]{width:64px;height:104px;pointer-events:none}',
     '.dt-hotspot[data-entry="zheng"] .dt-person,.dt-hotspot[data-entry="zheng"] .dt-prompt{pointer-events:auto}',
-    '@media(max-height:600px){.dt-hotspot[data-entry="chen"]{translate:0 44px}.dt-hotspot[data-entry="zhou"]{translate:-28px 0}.dt-hotspot[data-entry="laoliang"]{translate:0 -20px}}',
-    '@media(max-width:420px) and (min-height:601px){.dt-hotspot[data-entry="phoneflip"]{translate:0 -6px}}',
     '.dt-prompt{position:absolute;top:0;left:50%;display:grid;width:max-content;min-width:20px;max-width:72px;height:22px;place-items:center;padding:0 4px;transform:translateX(-50%);border:2px solid #28241d;background:#f3dfa5;box-shadow:2px 2px #000;color:#302a21;font-size:10px;font-weight:bold;line-height:1;text-shadow:none;white-space:nowrap}',
     '.dt-prompt::after{position:absolute;bottom:-5px;left:calc(50% - 4px);width:6px;height:6px;transform:rotate(45deg);border-right:2px solid #28241d;border-bottom:2px solid #28241d;background:#f3dfa5;content:""}',
     '.dt-person{display:block;width:var(--sprite-width,48px);height:var(--sprite-height,48px);flex:none;margin:0 0 2px;transform:scale(var(--depth-scale,1));transform-origin:bottom center;background-image:var(--sprite-src,url(/art/pancheng-npc-atlas-v1.webp));background-repeat:no-repeat;background-size:var(--sprite-size,400% 400%);background-position:var(--sprite-pos,var(--sprite-x) var(--sprite-y));filter:drop-shadow(2px 2px 0 #151515);image-rendering:pixelated}',
@@ -53,13 +52,13 @@ export function createDaytimeScreen(
     '</style>',
     '<div class="dt-world-plane"><img class="dt-world" src="/art/pancheng-district-pixel-v1.webp" alt="盘城像素街区全景：街道、店铺与交易所" draggable="false"><div class="dt-market-light" aria-hidden="true"></div>',
     '<section class="dt-map" aria-label="盘城街区人物与入口">',
-    entries.map((entry) => '<button class="dt-hotspot" type="button" data-entry="' + entry.id + '" aria-haspopup="dialog" aria-controls="dt-dialog" aria-expanded="false" aria-label="' + escapeHtml(entry.name + '，' + entry.place) + '" style="left:clamp(calc(50% - 50cqw + 32px),' + entry.x + '%,calc(50% + 50cqw - 32px));top:clamp(calc(50% - 50cqh + 32px),' + entry.y + '%,calc(50% + 50cqh - 32px));z-index:' + Math.round(entry.y * 10) + ';--depth-scale:' + (0.9 + entry.y / 500).toFixed(2) + '">' +
+    entries.map((entry) => '<button class="dt-hotspot" type="button" data-entry="' + entry.id + '" aria-haspopup="dialog" aria-controls="dt-dialog" aria-expanded="false" aria-label="' + escapeHtml(entry.name + '，' + entry.place) + '" style="--entry-x:' + entry.x + '%;--entry-y:' + entry.y + '%;z-index:' + Math.round(entry.y * 10) + ';--depth-scale:' + (0.9 + entry.y / 500).toFixed(2) + '">' +
       '<span class="dt-prompt" aria-hidden="true">' + entry.prompt + '</span>' + sprite(entry.id, entry.palette) +
       '<span class="dt-place">' + escapeHtml(entry.place) + '</span><span class="dt-person-name">' + escapeHtml(entry.name) + '</span></button>').join(''),
-    '<button class="dt-gate" type="button" data-entry="exchange" aria-label="进入交易所" style="left:clamp(calc(50% - 50cqw + 36px),84%,calc(50% + 50cqw - 36px));top:clamp(calc(50% - 50cqh + 36px),20%,calc(50% + 50cqh - 36px))">交易所<br>开市中 ›</button>',
+    '<button class="dt-gate" type="button" data-entry="exchange" aria-label="进入交易所">交易所<br>开市中 ›</button>',
     '</section></div>',
     '<header class="dt-hud"><h1 class="dt-title"></h1><span class="dt-stat dt-cash"></span><span class="dt-stat dt-energy"></span><span class="dt-stat dt-leech"></span><span class="dt-crisis" hidden></span></header>',
-    '<p class="dt-hint">沿街探索 · 点击人物头上的提示或地点入口</p>',
+    '<p class="dt-hint">拖动街区探索 · 点击人物头上的提示或地点入口</p>',
     '<div class="dt-modal" hidden><section id="dt-dialog" class="dt-dialog" role="dialog" aria-modal="false" aria-labelledby="dt-npc-name">',
     '<div class="dt-dialog-head"><span class="dt-avatar" aria-hidden="true">人</span><strong id="dt-npc-name"></strong></div>',
     '<p class="dt-dialog-copy"></p><div class="dt-dialog-actions"><button class="dt-dialog-button dt-primary" type="button"></button><button class="dt-dialog-button" type="button" data-action="close">离开</button></div></section></div>',
@@ -72,6 +71,8 @@ export function createDaytimeScreen(
   const primaryButton = screen.querySelector<HTMLButtonElement>('.dt-primary')!;
   const closeButton = screen.querySelector<HTMLButtonElement>('[data-action="close"]')!;
   const toast = screen.querySelector<HTMLElement>('.dt-toast')!;
+  const worldPlane = screen.querySelector<HTMLElement>('.dt-world-plane')!;
+  const mapCamera = new MapCameraController(screen, worldPlane, modal);
   let activeTrigger: HTMLButtonElement | null = null;
   let dialogueAnimation: Animation | null = null;
   const idleAnimations: Animation[] = [];
@@ -111,6 +112,7 @@ export function createDaytimeScreen(
     stopIdleMotion();
     dialogueAnimation?.cancel();
     dialogueAnimation = null;
+    mapCamera.destroy();
     screenObserver.disconnect();
     reducedMotion.removeEventListener('change', syncIdleMotion);
     document.removeEventListener('visibilitychange', syncIdleVisibility);

@@ -11,6 +11,7 @@ import type { RiskReplayAction } from './riskReplayTypes';
 import { reduceDebtInstallmentAction } from './systems/debtInstallments';
 import type { BrokerNegotiationAction, CafeShiftAction, ChartLessonAction, CompanyDossierAction, DeliveryChoice, FactoryShiftAction, GamePhase, GameState, JiugeNegotiationAction, LonggeClueChoice, LonggeConclusion, LonggeOpeningChoice, PhoneFlipAction, PlayerGender, StreamChoice, ZhengBikeRepairAction } from './types';
 export type GameAction = import('./marketStallTypes').LaoLiangStallAction | RiskReplayAction | DebtInstallmentAction | CafeShiftAction | ChartLessonAction | { type: 'ADVANCE_TICK' }
+  | { type: 'ADVANCE_TICKS'; count: number; stockIds?: readonly string[] }
   | { type: 'ADVANCE_PHASE' }
   | { type: 'SELECT_CHARACTER'; gender: PlayerGender }
   | { type: 'CHANGE_PHASE'; phase: GamePhase }
@@ -39,14 +40,12 @@ function getEquity(state: GameState): number {
   );
   return Number((state.cash + portfolioValue - state.debt).toFixed(2));
 }
-function seedForStock(state: GameState, stockId: string): number {
+function seedForStock(day: number, stockId: string, stock: GameState['stocks'][string]): number {
   let hash = 2166136261;
   for (const character of stockId) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
-  const stock = state.stocks[stockId];
-  const historyLength = stock?.priceHistory.length ?? 0;
-  const volume = stock?.volume ?? 0;
-  const priceCents = Math.round((stock?.price ?? 0) * 100);
-  return (hash ^ Math.imul(state.day, 0x9E3779B1) ^ historyLength ^ volume ^ priceCents) >>> 0;
+  const historyLength = stock.priceHistory.length;
+  const priceCents = Math.round(stock.price * 100);
+  return (hash ^ Math.imul(day, 0x9E3779B1) ^ historyLength ^ stock.volume ^ priceCents) >>> 0;
 }
 function closeTrading(state: GameState): GameState {
   const settled = settlePeriodicCosts(state);
@@ -58,6 +57,22 @@ function closeTrading(state: GameState): GameState {
     debtCrisisRecoveryDay: crisisRecovered ? state.day : state.debtCrisisRecoveryDay,
   };
 }
+function advanceMarketTicks(state: GameState, count: number, stockIds?: readonly string[]): GameState {
+  if (state.phase !== 'TRADING' || !Number.isInteger(count) || count < 1
+    || state.marketTicksThisDay >= marketTicksPerDay) return state;
+
+  const ticks = Math.min(count, marketTicksPerDay - state.marketTicksThisDay);
+  const stocks = { ...state.stocks };
+  const idsToTick = new Set(stockIds ?? Object.keys(stocks));
+  for (let tick = 0; tick < ticks; tick += 1) {
+    for (const id of idsToTick) {
+      const stock = stocks[id];
+      if (stock) stocks[id] = tickStock(stock, mulberry32(seedForStock(state.day, id, stock)));
+    }
+  }
+  const tickedState = { ...state, stocks, marketTicksThisDay: state.marketTicksThisDay + ticks };
+  return tickedState.marketTicksThisDay >= marketTicksPerDay ? closeTrading(tickedState) : tickedState;
+}
 export function gameReducer(state: GameState, action: GameAction): GameState {
   if (!permitsActivityAction(state.activeActivity, action)) return state;
   if (action.type === 'RESUME_DEBT_INSTALLMENTS' || action.type === 'CANCEL_DEBT_INSTALLMENTS') return reduceDebtInstallmentAction(state, action);
@@ -65,14 +80,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
   if (activityResult) return rememberCompletedActivity(state, activityResult);
   switch (action.type) {
     case 'ADVANCE_TICK': {
-      if (state.phase !== 'TRADING' || state.marketTicksThisDay >= marketTicksPerDay) return state;
-      const stocks: GameState['stocks'] = {};
-      for (const [id, stock] of Object.entries(state.stocks)) {
-        stocks[id] = tickStock(stock, mulberry32(seedForStock(state, id)));
-      }
-      const tickedState = { ...state, stocks, marketTicksThisDay: state.marketTicksThisDay + 1 };
-      return tickedState.marketTicksThisDay >= marketTicksPerDay ? closeTrading(tickedState) : tickedState;
+      return advanceMarketTicks(state, 1);
     }
+    case 'ADVANCE_TICKS':
+      return advanceMarketTicks(state, action.count, action.stockIds);
     case 'ADVANCE_PHASE': {
       switch (state.phase) {
         case 'PRE_MARKET':
