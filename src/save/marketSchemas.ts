@@ -36,6 +36,9 @@ const orderBookLevelSchema = z.object({
 const stockStateSchema = z.object({
   id: z.string(),
   name: z.string(),
+  symbol: z.string().min(1).max(16).optional(),
+  sector: z.string().min(1).max(32).optional(),
+  volatility: z.number().finite().min(0.5).max(2).optional(),
   price: z.number(),
   open: z.number(),
   high: z.number(),

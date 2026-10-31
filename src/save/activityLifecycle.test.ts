@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { gameReducer, type GameAction } from '../core/reducer';
 import { createInitialState } from '../core/state';
 import { factoryInspectionForDay } from '../core/systems/factoryShift';
-import { cafeCustomerFor, correctCafeChoiceFor } from '../core/systems/cafeShift';
-import type { GameState } from '../core/types';
+import { cafeScenarioFor } from '../core/systems/cafeShift';
+import type { GameState, NpcId } from '../core/types';
 import { loadSavedGame, saveGame } from './storage';
 
 const store = vi.hoisted(() => ({ value: null as unknown }));
@@ -17,50 +17,67 @@ vi.mock('localforage', () => ({
 }));
 beforeEach(() => { store.value = null; });
 
-const activities: { name: string; start: GameAction; steps: GameAction[]; abandon?: GameAction }[] = [
-  { name: 'delivery', start: { type: 'START_DELIVERY_RUN' }, steps: [
+const activities: { name: string; id: string; npcId: NpcId; start: GameAction; steps: GameAction[]; abandon?: GameAction }[] = [
+  { name: 'delivery', id: 'WANG_DELIVERY', npcId: 'delivery', start: { type: 'START_DELIVERY_RUN' }, steps: [
     { type: 'CHOOSE_DELIVERY_ROUTE', choice: 'ALLEY' },
     { type: 'CHOOSE_DELIVERY_ROUTE', choice: 'MAIN' },
     { type: 'CHOOSE_DELIVERY_ROUTE', choice: 'RUSH' },
   ] },
-  { name: 'Longge', start: { type: 'START_LONGGE_CHAT' }, abandon: { type: 'ABANDON_LONGGE_CHAT' }, steps: [
+  { name: 'Longge', id: 'LONGGE_CHAT', npcId: 'longge', start: { type: 'START_LONGGE_CHAT' }, abandon: { type: 'ABANDON_LONGGE_CHAT' }, steps: [
     { type: 'CHOOSE_LONGGE_CLUE', choice: 'VERIFY_ORIGIN' },
     { type: 'CHOOSE_LONGGE_CLUE', choice: 'READ_TAPE' },
     { type: 'CHOOSE_LONGGE_CLUE', choice: 'CHECK_NOTICE' },
     { type: 'CONCLUDE_LONGGE_CHAT', conclusion: 'INSUFFICIENT' },
   ] },
-  { name: 'stream', start: { type: 'START_STREAM_RUN' }, abandon: { type: 'ABANDON_STREAM_RUN' }, steps: [
+  { name: 'stream', id: 'XIAOLIAN_STREAM', npcId: 'xiaolian', start: { type: 'START_STREAM_RUN' }, abandon: { type: 'ABANDON_STREAM_RUN' }, steps: [
     { type: 'CHOOSE_STREAM_OPTION', choice: 'HONEST_REVIEW' },
     { type: 'CHOOSE_STREAM_OPTION', choice: 'ANSWER_QUESTIONS' },
     { type: 'CHOOSE_STREAM_OPTION', choice: 'TRANSPARENT_DEAL' },
   ] },
-  { name: 'Chen', start: { type: 'START_CHEN_DOSSIER' }, abandon: { type: 'ABANDON_CHEN_DOSSIER' }, steps: [
+  { name: 'Chen', id: 'CHEN_DOSSIER', npcId: 'chen', start: { type: 'START_CHEN_DOSSIER' }, abandon: { type: 'ABANDON_CHEN_DOSSIER' }, steps: [
     { type: 'CHOOSE_CHEN_EVIDENCE', choice: 'VERIFY_FILING' },
     { type: 'CHOOSE_CHEN_EVIDENCE', choice: 'CHECK_SUPPLIER' },
     { type: 'CHOOSE_CHEN_EVIDENCE', choice: 'MATCH_INVOICES' },
     { type: 'CONCLUDE_CHEN_DOSSIER', conclusion: 'WAIT' },
   ] },
-  { name: 'Jiuge', start: { type: 'START_JIUGE_NEGOTIATION' }, abandon: { type: 'ABANDON_JIUGE_NEGOTIATION' }, steps: [
+  { name: 'Jiuge', id: 'JIUGE_NEGOTIATION', npcId: 'jiuge', start: { type: 'START_JIUGE_NEGOTIATION' }, abandon: { type: 'ABANDON_JIUGE_NEGOTIATION' }, steps: [
     { type: 'CHOOSE_JIUGE_NEGOTIATION', choice: 'SHOW_LEDGER' },
     { type: 'CHOOSE_JIUGE_NEGOTIATION', choice: 'PROVE_INCOME' },
     { type: 'CHOOSE_JIUGE_NEGOTIATION', choice: 'ASK_INTEREST_GRACE' },
   ] },
-  { name: 'factory shift', start: { type: 'START_FACTORY_SHIFT' }, steps: [0, 1, 2].map((step) => ({
-    type: 'CHOOSE_FACTORY_CHECK' as const, choice: factoryInspectionForDay(35, step).correctChoice,
+  { name: 'factory shift', id: 'WANG_FACTORY', npcId: 'wang', start: { type: 'START_FACTORY_SHIFT' }, steps: [0, 1, 2].map((step) => ({
+    type: 'CHOOSE_FACTORY_CHECK' as const, choice: factoryInspectionForDay(35, step, 3, 4).correctChoice,
   })) },
-  { name: 'chart lesson', start: { type: 'START_CHART_LESSON' }, abandon: { type: 'ABANDON_CHART_LESSON' }, steps: [
+  { name: 'chart lesson', id: 'BODHISATTVA_CHART_LESSON', npcId: 'bodhisattva', start: { type: 'START_CHART_LESSON' }, abandon: { type: 'ABANDON_CHART_LESSON' }, steps: [
     { type: 'ANSWER_CHART_LESSON', choice: 'RIDE_HIGHER_LOWS' },
     { type: 'ANSWER_CHART_LESSON', choice: 'WAIT_FOR_VOLUME' },
     { type: 'ANSWER_CHART_LESSON', choice: 'WAIT_FOR_RANGE_BREAK' },
   ] },
-  { name: 'cafe shift', start: { type: 'START_CAFE_SHIFT' }, abandon: { type: 'ABANDON_CAFE_SHIFT' }, steps: [0, 1, 2].map((step) => ({
-    type: 'SERVE_CAFE_ORDER' as const, choice: correctCafeChoiceFor(cafeCustomerFor(35, step as 0 | 1 | 2)),
+  { name: 'cafe shift', id: 'SUJIE_CAFE_SHIFT', npcId: 'sujie', start: { type: 'START_CAFE_SHIFT' }, abandon: { type: 'ABANDON_CAFE_SHIFT' }, steps: [0, 1, 2].map((step) => ({
+    type: 'SERVE_CAFE_ORDER' as const, choice: cafeScenarioFor(35, step as 0 | 1 | 2, 4, 4).correctChoice,
   })) },
-  { name: 'Zheng bike repair', start: { type: 'START_ZHENG_BIKE_REPAIR' }, abandon: { type: 'ABANDON_ZHENG_BIKE_REPAIR' }, steps: [
+  { name: 'Zheng bike repair', id: 'ZHENG_BIKE_REPAIR', npcId: 'zheng', start: { type: 'START_ZHENG_BIKE_REPAIR' }, abandon: { type: 'ABANDON_ZHENG_BIKE_REPAIR' }, steps: [
     { type: 'TEST_BIKE_PART', part: 'BATTERY' },
     { type: 'REPAIR_BIKE_FAULT', part: 'BATTERY' },
     { type: 'REPAIR_BIKE_FAULT', part: 'BRAKES' },
     { type: 'REPAIR_BIKE_FAULT', part: 'CONTROLLER' },
+  ] },
+  { name: 'market stall', id: 'LAOLIANG_MARKET_STALL', npcId: 'laoliang', start: { type: 'START_LAOLIANG_STALL' }, steps: [
+    { type: 'SELECT_STALL_PRODUCT', product: 'THERMOS' }, { type: 'SELL_STALL_GOODS', priceTier: 'STANDARD' },
+    { type: 'SELECT_STALL_PRODUCT', product: 'RAINCOAT' }, { type: 'SELL_STALL_GOODS', priceTier: 'VALUE' },
+    { type: 'SELECT_STALL_PRODUCT', product: 'CABLE' }, { type: 'SELL_STALL_GOODS', priceTier: 'PREMIUM' },
+  ] },
+  { name: 'broker negotiation', id: 'ZHOU_BROKER_NEGOTIATION', npcId: 'zhou', start: { type: 'START_BROKER_NEGOTIATION' }, steps: [
+    { type: 'ESTIMATE_BROKER_TURNOVER', turnover: 36000 }, { type: 'CHOOSE_BROKER_PLAN', plan: 'LOW_COMMISSION' },
+  ] },
+  { name: 'risk replay', id: 'SWEEPER_RISK_REPLAY', npcId: 'sweeper', start: { type: 'START_RISK_REPLAY' }, steps: [
+    { type: 'COMMIT_RISK_ALLOCATION', allocation: 20 }, { type: 'COMMIT_RISK_ALLOCATION', allocation: 50 },
+    { type: 'COMMIT_RISK_ALLOCATION', allocation: 0 },
+  ] },
+  { name: 'phone flip', id: 'PHONE_FLIP', npcId: 'phoneflip', start: { type: 'START_PHONE_FLIP' }, steps: [
+    { type: 'INSPECT_PHONE_LOT' }, { type: 'RESOLVE_PHONE_LOT', choice: 'BARGAIN_QUICK' },
+    { type: 'INSPECT_PHONE_LOT' }, { type: 'RESOLVE_PHONE_LOT', choice: 'PASS' },
+    { type: 'INSPECT_PHONE_LOT' }, { type: 'RESOLVE_PHONE_LOT', choice: 'ASK_REFURB' },
   ] },
 ];
 
@@ -128,6 +145,15 @@ describe.each(activities)('$name lifecycle isolation', (activity) => {
       state = gameReducer(state, step);
     }
     expect(state.activeActivity?.status).toBe('RESULT');
+    expect(state.npcActivityMemory[activity.npcId]).toMatchObject({
+      completedRuns: 1,
+      lastCompletedDay: 35,
+    });
+    const trace = state.npcActivityMemory[activity.npcId].lastTrace;
+    expect(trace).not.toBeNull();
+    if (!trace) throw new Error('Completed activity should create an NPC memory trace.');
+    expect(trace.activityId).toBe(activity.id);
+    expect(trace.choiceKeys.length).toBeGreaterThan(0);
   });
 
   it('restores every step and the settled receipt without replaying rewards', async () => {
@@ -136,6 +162,7 @@ describe.each(activities)('$name lifecycle isolation', (activity) => {
     for (const action of activity.steps) state = await restore(gameReducer(state, action));
     expect(state).toEqual(uninterrupted);
     expect(state.activeActivity?.status).toBe('RESULT');
+    expect(state.npcActivityMemory[activity.npcId].completedRuns).toBe(1);
     for (const action of [...Object.values(externalActions), activity.start, ...activity.steps,
       ...(activity.abandon ? [activity.abandon] : [])]) {
       expect(gameReducer(state, action), action.type).toBe(state);
@@ -143,6 +170,7 @@ describe.each(activities)('$name lifecycle isolation', (activity) => {
     const hub = await restore(gameReducer(state, { type: 'RETURN_FROM_ACTIVITY' }));
     expect(hub.activeActivity).toBeNull();
     expect(hub.phase).toBe('DAYTIME');
+    expect(hub.npcActivityMemory[activity.npcId].completedRuns).toBe(1);
     for (const action of activity.steps) expect(gameReducer(hub, action)).toBe(hub);
     expect(gameReducer(hub, { type: 'RETURN_FROM_ACTIVITY' })).toBe(hub);
     expect(gameReducer(hub, activity.start)).toBe(hub);

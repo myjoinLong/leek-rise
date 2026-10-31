@@ -3,6 +3,7 @@ import type { NightVM } from './types';
 export function createMockNightVM(): NightVM {
   return {
     day: 4,
+    chapter: { number: 1, title: '活下去', startDay: 1, endDay: 30, fixedCostMultiplier: 1 },
     pnlBreakdown: {
       tradingPnl: -1240,
       workIncome: 120,
@@ -33,6 +34,7 @@ export function createMockNightVM(): NightVM {
     rateRestructureApplied: false,
     debtRatePlanWeeksRemaining: 0,
     debtCrisisStarted: false,
+    debtCrisisRecoveredTonight: false,
     debtNegotiationCompleted: false,
     cash: 1622,
     debt: 18000,

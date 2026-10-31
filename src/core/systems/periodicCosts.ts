@@ -1,5 +1,6 @@
 import type { GameState, PeriodicCostLedger } from '../types';
 import { settleDebtInstallments } from './debtInstallments';
+import { fixedOperatingCostMultiplierForDay } from '../chapterRules';
 
 export const periodicCostPolicy = {
   intervalDays: 7,
@@ -28,17 +29,21 @@ export function settlePeriodicCosts(state: GameState): GameState {
     ? periodicCostPolicy.restructuredWeeklyInterestRate
     : periodicCostPolicy.weeklyInterestRate;
   const interest = interestGraceApplied ? 0 : money(state.debt * weeklyInterestRate);
+  const fixedCostMultiplier = fixedOperatingCostMultiplierForDay(state.day);
+  const rent = money(periodicCostPolicy.rent * fixedCostMultiplier);
+  const membership = money(periodicCostPolicy.membership * fixedCostMultiplier);
+  const equipment = money(periodicCostPolicy.equipment * fixedCostMultiplier);
   const platformShare = money(state.weeklyStreamIncome * periodicCostPolicy.streamPlatformShareRate);
   const fixedCosts = money(
-    periodicCostPolicy.rent + periodicCostPolicy.membership + periodicCostPolicy.equipment + platformShare,
+    rent + membership + equipment + platformShare,
   );
   const fixedCostsPaid = Math.min(Math.max(0, state.cash), fixedCosts);
   const deferred = money(fixedCosts - fixedCostsPaid);
   const periodicCostLedger: PeriodicCostLedger = {
     interest,
-    rent: periodicCostPolicy.rent,
-    membership: periodicCostPolicy.membership,
-    equipment: periodicCostPolicy.equipment,
+    rent,
+    membership,
+    equipment,
     platformShare,
     deferred,
     interestGraceApplied,

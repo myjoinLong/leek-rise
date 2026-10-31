@@ -7,6 +7,13 @@ export type ChartLessonChoice =
   | 'WAIT_FOR_RANGE_BREAK' | 'ASSUME_REVERSAL' | 'DOUBLE_POSITION';
 export type ChartLessonSignal = 'HIGHER_LOWS' | 'WEAK_BREAKOUT' | 'NARROW_RANGE';
 
+export interface ChartLessonReview {
+  previousDay: number;
+  step: ChartLessonStep;
+  choice: ChartLessonChoice;
+  signal: ChartLessonSignal;
+}
+
 export interface ChartLessonDecision {
   step: ChartLessonStep;
   choice: ChartLessonChoice;
@@ -17,6 +24,11 @@ export interface ChartLessonActiveState {
   id: 'BODHISATTVA_CHART_LESSON';
   day: number;
   stockId: string;
+  scenarioVersion?: 2;
+  scenarioSeed?: number;
+  scenarioIndex?: number;
+  priorScore?: number | null;
+  priorReview?: ChartLessonReview;
   status: 'ACTIVE';
   step: ChartLessonStep;
   decisions: ChartLessonDecision[];

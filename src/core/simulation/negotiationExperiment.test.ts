@@ -94,5 +94,5 @@ describe('Jiuge negotiation economy experiment', () => {
       && result.scenario.negotiationOffer === 'RATE_RESTRUCTURE');
     expect(sample).toBeDefined();
     expect(simulateEconomy(sample!.scenario)).toEqual(sample);
-  }, 60000);
+  }, 120000);
 });

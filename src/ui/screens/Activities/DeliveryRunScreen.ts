@@ -1,7 +1,7 @@
-import { deliveryStops, minimumEnergyAfterDeliveryStop } from '../../../core/systems/deliveryRun';
+import { deliveryStopsFor, minimumEnergyAfterDeliveryStop } from '../../../core/systems/deliveryRun';
 import type { GameAction } from '../../../core/reducer';
 import type { DeliveryRouteOption, DeliveryStop } from '../../../core/systems/deliveryRun';
-import type { GameState } from '../../../core/types';
+import type { DeliveryReturnContext, GameState } from '../../../core/types';
 
 function escapeHtml(value: string): string {
   const entities: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -16,17 +16,27 @@ function renderRoute(option: DeliveryRouteOption, energy: number, minimumAfter: 
     '<span class="dr-route-cost">预计收入 ¥' + option.income + ' · 精力 -' + option.energyCost + '</span></button>';
 }
 
-function renderStop(stop: DeliveryStop, stopIndex: number, state: GameState): string {
-  const minimumAfter = minimumEnergyAfterDeliveryStop(stopIndex);
+function renderDispatcherReturnLine(stopIndex: number, returnContext: DeliveryReturnContext | undefined): string {
+  if (stopIndex !== 2 || !returnContext) return '';
+  const message = returnContext.kind === 'RELIABLE'
+    ? `“第 ${returnContext.previousDay} 天你按时把单送完了。这单熟客服务返 ¥8，少耗 2 点精力。”`
+    : `“第 ${returnContext.previousDay} 天你接过加急单。这次加急补贴 ¥15，额外耗 3 点精力，接不接你自己定。”`;
+  return '<p class="dr-dispatcher-note">调度员翻着记录：' + escapeHtml(message) + '</p>';
+}
+
+function renderStop(stop: DeliveryStop, stopIndex: number, state: GameState, stops: readonly DeliveryStop[]): string {
+  const minimumAfter = minimumEnergyAfterDeliveryStop(stopIndex, stops);
   const run = state.activeActivity;
   const completedIncome = run?.id === 'WANG_DELIVERY' ? run.totalIncome : 0;
+  const returnContext = run?.id === 'WANG_DELIVERY' ? run.returnContext : undefined;
   const quitLabel = run?.id === 'WANG_DELIVERY' && run.decisions.length > 0
     ? '提前收工 · 结算已完成订单 ¥' + run.totalIncome + '（今天不能再接工作）'
     : '离开这趟配送 · 没有完成订单，不发工资';
   return '<section class="dr-order" aria-label="当前订单">' +
-    '<div class="dr-progress"><span>订单 ' + (stopIndex + 1) + ' / ' + deliveryStops.length + '</span>' +
+    '<div class="dr-progress"><span>订单 ' + (stopIndex + 1) + ' / ' + stops.length + '</span>' +
     '<span>现金 ¥' + state.cash.toLocaleString() + ' · 精力 ' + state.energy + ' · 已完成 ¥' + completedIncome + '</span></div>' +
     '<h2>' + escapeHtml(stop.title) + '</h2><p class="dr-briefing">' + escapeHtml(stop.briefing) + '</p>' +
+    renderDispatcherReturnLine(stopIndex, returnContext) +
     '<p class="dr-prompt">你准备怎么送？</p><div class="dr-routes">' +
     stop.options.map((option) => renderRoute(option, state.energy, minimumAfter)).join('') + '</div>' +
     (stop.options.some((option) => state.energy - option.energyCost < minimumAfter)
@@ -57,15 +67,18 @@ export function createDeliveryRunScreen(
   screen.innerHTML = [
     '<style>',
     '.dr-screen{position:relative;width:100%;height:100vh;height:100dvh;max-width:480px;margin:0 auto;overflow:hidden;color:#fff4d2;font-family:"Courier New",monospace;background:#263744}',
-    '.dr-backdrop{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 88%;image-rendering:pixelated}',
+    '.dr-backdrop{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;image-rendering:pixelated}',
     '.dr-screen::before{position:absolute;z-index:1;inset:0;background:linear-gradient(180deg,rgba(13,22,28,.15),rgba(13,22,28,.12) 30%,rgba(13,22,28,.8));content:""}',
     '.dr-header{position:absolute;z-index:2;top:var(--safe-top);right:12px;left:12px;padding:10px;border:2px solid #e4ca78;background:rgba(25,34,38,.91);box-shadow:4px 4px #000}',
     '.dr-kicker{margin-bottom:4px;color:#ffc85b;font-size:11px;letter-spacing:1px}.dr-title{font-size:18px}.dr-stats{margin-top:6px;color:#e3dcc5;font-size:11px}',
-    '.dr-map{position:absolute;z-index:2;top:23%;right:18px;left:18px;height:25%;min-height:150px;border:3px solid #e4ca78;background:rgba(24,41,48,.89);box-shadow:5px 5px #000}',
+    '.dr-courier{position:absolute;z-index:3;top:calc(var(--safe-top) + 84px);left:7%;pointer-events:none}.dr-courier-sprite{display:block;width:auto;height:clamp(132px,38vw,164px);object-fit:contain;object-position:center bottom;image-rendering:pixelated;filter:drop-shadow(2px 2px 0 #151515)}',
+    '.dr-dispatcher{position:absolute;z-index:2;top:calc(var(--safe-top) + 15%);right:13%;display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px;border:1px solid #d4bd78;background:rgba(25,34,38,.88);box-shadow:3px 3px #000;color:#fff0d2;font-size:9px;pointer-events:none}.dr-dispatcher-sprite{display:block;width:44px;height:58px;background:url("/art/delivery-dispatcher-character-v1.webp") center/contain no-repeat;image-rendering:pixelated;filter:drop-shadow(2px 2px 0 #151515)}',
+    '.dr-map{position:absolute;z-index:2;top:31%;right:18px;left:18px;height:18%;min-height:150px;border:3px solid #e4ca78;background:rgba(24,41,48,.89);box-shadow:5px 5px #000}',
     '.dr-map svg{width:100%;height:100%}.dr-pin{fill:#ffde70;stroke:#332d20;stroke-width:3}.dr-route-line{fill:none;stroke:#f8df89;stroke-width:5;stroke-dasharray:8 6}',
-    '.dr-order{position:absolute;z-index:3;right:12px;bottom:calc(var(--safe-bottom) + 10px);left:12px;max-height:calc(100% - var(--safe-top) - 24px);overflow-y:auto;padding:12px;border:3px solid #e4ca78;background:rgba(29,34,38,.97);box-shadow:5px 5px #000}',
+    '.dr-order{position:absolute;z-index:3;right:12px;bottom:calc(var(--safe-bottom) + 10px);left:12px;max-height:52%;overflow-y:auto;padding:12px;border:3px solid #e4ca78;background:rgba(29,34,38,.97);box-shadow:5px 5px #000}',
     '.dr-progress{display:flex;justify-content:space-between;gap:8px;color:#d7cfae;font-size:10px}.dr-order h2,.dr-result h2{margin:8px 0;color:#ffe28a;font-size:17px}',
     '.dr-briefing{color:#e9e2d1;font-size:12px;line-height:1.5}.dr-prompt{margin:8px 0 6px;color:#f2cf79;font-size:11px}',
+    '.dr-dispatcher-note{margin:8px 0;padding:6px 8px;border-left:2px solid #e4ca78;background:rgba(20,28,31,.75);color:#ffe3a0;font-size:10px;line-height:1.4}',
     '.dr-routes{display:grid;grid-template-columns:1fr 1fr;gap:8px}.dr-route{display:flex;min-height:88px;flex-direction:column;align-items:flex-start;justify-content:space-between;padding:8px;border:2px solid #c7b77e;border-radius:0;background:#38434a;box-shadow:3px 3px #000;color:#fff4d2;text-align:left;font-family:inherit;cursor:pointer}',
     '.dr-energy-hint{margin-top:7px;color:#ffd37b;font-size:10px}',
     '.dr-quit{min-height:44px;margin-top:9px;padding:5px 8px;border:1px solid #8e8878;background:transparent;color:#ddd5c1;font:10px "Courier New",monospace;cursor:pointer}.dr-quit:focus-visible,.dr-return:focus-visible{outline:2px solid #ffe28a;outline-offset:2px}',
@@ -75,10 +88,12 @@ export function createDeliveryRunScreen(
     '.dr-receipt li{display:flex;justify-content:space-between;gap:8px;padding-bottom:5px;border-bottom:1px solid #52534c;color:#dedaca;font-size:10px}.dr-receipt strong{flex:none;color:#ff8170}',
     '.dr-return{width:100%;min-height:48px;border:2px solid #f3d477;border-radius:0;background:#43505a;box-shadow:3px 3px #000;color:#fff4d2;font:bold 14px "Courier New",monospace;cursor:pointer}',
     '.dr-return:active{transform:translate(2px,2px);box-shadow:1px 1px #000}',
-    '@media(max-height:700px){.dr-map{top:19%;height:22%}.dr-order{padding:8px}.dr-route{min-height:72px}}',
+    '@media(max-height:700px){.dr-courier-sprite{height:124px}.dr-map{top:32%;height:14%;min-height:96px}.dr-order{max-height:55%;padding:8px}.dr-route{min-height:72px}}',
     '</style>',
-    '<img class="dr-backdrop" src="/art/pancheng-district.png" alt="" aria-hidden="true">',
+    '<img class="dr-backdrop" src="/art/delivery-dispatch-street-v1.webp" alt="" aria-hidden="true">',
     '<header class="dr-header"><p class="dr-kicker">王总的临时单 · 支线副本</p><h1 class="dr-title">外卖跑单</h1><p class="dr-stats"></p></header>',
+    '<span class="dr-courier" aria-hidden="true"><img class="dr-courier-sprite" alt=""></span>',
+    '<span class="dr-dispatcher" aria-hidden="true"><span class="dr-dispatcher-sprite"></span><b>调度员</b></span>',
     '<div class="dr-map" role="img" aria-label="本轮配送路线示意图"><svg viewBox="0 0 360 180" aria-hidden="true">',
     '<path d="M0 45H130V130H250V65H360M42 0V45M130 45H250M250 65V180M75 130V180" fill="none" stroke="#7c8b83" stroke-width="28"/>',
     '<path class="dr-route-line" d="M42 20L130 45L130 130L250 130L250 65L320 65"/>',
@@ -92,17 +107,23 @@ export function createDeliveryRunScreen(
 
   const content = screen.querySelector<HTMLElement>('.dr-content')!;
   const stats = screen.querySelector<HTMLElement>('.dr-stats')!;
+  const courier = screen.querySelector<HTMLImageElement>('.dr-courier-sprite')!;
 
   const render = (): void => {
+    const courierImage = state.gender === 'FEMALE'
+      ? '/art/player-courier-female-v1.png'
+      : '/art/player-courier-male-v1.png';
+    if (courier.getAttribute('src') !== courierImage) courier.src = courierImage;
     const run = state.activeActivity;
     if (!run || run.id !== 'WANG_DELIVERY') {
       content.innerHTML = '<section class="dr-result"><h2>跑单记录已结束</h2><button class="dr-return" type="button" data-action="return">回到盘城街区</button></section>';
       return;
     }
     stats.textContent = '第 ' + run.day + ' 天 · 精力 ' + state.energy + '/' + state.energyMax;
+    const stops = deliveryStopsFor(run.day, run.scenarioVersion ?? 1, run.scenarioSeed ?? 4, run.returnContext ?? null);
     content.innerHTML = run.status === 'RESULT'
       ? renderResult(state)
-      : renderStop(deliveryStops[run.stopIndex]!, run.stopIndex, state);
+      : renderStop(stops[run.stopIndex]!, run.stopIndex, state, stops);
     content.querySelectorAll<HTMLElement>('.dr-result, .dr-order').forEach((panel) => {
       panel.animate([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'translateY(0)' }], {
         duration: 180,

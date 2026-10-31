@@ -1,7 +1,10 @@
 import type { GameState } from '../types';
 import type { RiskReplayAction, RiskReplayStep } from '../riskReplayTypes';
+import { riskReplayCaseForRun, riskReplayScenarioIndex, riskReplayScenarioVersion } from '../riskReplayScenarios';
+import { riskReplayPolicy } from '../riskReplayRules';
+import { riskReplayMemoryReviewFor } from '../riskReplayMemory';
 
-export const riskReplayPolicy = { startingEquity: 10000, lossBudget: 300, energyPerRound: 4, minimumEnergy: 12 } as const;
+export { riskReplayPolicy } from '../riskReplayRules';
 export const riskReplayCases = [
   { stressPercent: 12, returnPercent: 6 },
   { stressPercent: 10, returnPercent: -8 },
@@ -9,16 +12,27 @@ export const riskReplayCases = [
 ] as const;
 const money = (value: number): number => Number(value.toFixed(2));
 
-export function getReplayExposure(equity: number, step: RiskReplayStep, allocation: number): { invested: number; stressLoss: number } {
+export function getReplayExposure(
+  equity: number,
+  step: RiskReplayStep,
+  allocation: number,
+  stressPercent: number = riskReplayCases[step].stressPercent,
+): { invested: number; stressLoss: number } {
   const invested = money(equity * allocation / 100);
-  return { invested, stressLoss: money(invested * riskReplayCases[step].stressPercent / 100) };
+  return { invested, stressLoss: money(invested * stressPercent / 100) };
 }
 
 export function reduceRiskReplay(state: GameState, action: RiskReplayAction): GameState {
   if (action.type === 'START_RISK_REPLAY') {
     if (state.phase !== 'DAYTIME' || state.activeActivity || state.riskReplayVisitedToday || state.energy < riskReplayPolicy.minimumEnergy) return state;
+    const memoryReview = riskReplayMemoryReviewFor(state);
+    const priorBudgetScore = memoryReview?.priorBudgetScore ?? null;
+    const priorReview = memoryReview?.priorReview ?? null;
     return { ...state, riskReplayVisitedToday: true, activeActivity: {
-      id: 'SWEEPER_RISK_REPLAY', day: state.day, status: 'ACTIVE', step: 0,
+      id: 'SWEEPER_RISK_REPLAY', day: state.day, scenarioVersion: riskReplayScenarioVersion,
+      scenarioSeed: state.scenarioSeed, scenarioIndex: riskReplayScenarioIndex(state.day, state.scenarioSeed),
+      priorBudgetScore, ...(priorReview ? { priorReview } : {}),
+      status: 'ACTIVE', step: 0,
       equity: riskReplayPolicy.startingEquity, energySpent: 0, decisions: [],
     } };
   }
@@ -27,8 +41,8 @@ export function reduceRiskReplay(state: GameState, action: RiskReplayAction): Ga
   if (action.type === 'ABANDON_RISK_REPLAY') return { ...state, activeActivity: null };
   const allocation = action.allocation;
   if (!Number.isInteger(allocation) || allocation < 0 || allocation > 100 || state.energy < riskReplayPolicy.energyPerRound) return state;
-  const sample = riskReplayCases[run.step];
-  const exposure = getReplayExposure(run.equity, run.step, allocation);
+  const sample = riskReplayCaseForRun(run, run.step);
+  const exposure = getReplayExposure(run.equity, run.step, allocation, sample.stressPercent);
   const decision = { step: run.step, allocation, equityBefore: run.equity, ...exposure,
     withinBudget: exposure.stressLoss <= riskReplayPolicy.lossBudget,
     pnl: money(exposure.invested * sample.returnPercent / 100),

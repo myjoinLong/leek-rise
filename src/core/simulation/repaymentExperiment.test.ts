@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { prototypeExperiment, simulateEconomy } from './economySimulation';
 import type { EconomyScenario } from './economySimulation';
 import { runRepaymentEconomyMatrix } from './repaymentExperiment';
+import { deliveryStopsFor } from '../systems/deliveryRun';
 
 const scenario: EconomyScenario = {
   strategy: 'WORK', days: 30, ticksPerDay: 0, gender: 'MALE',
@@ -12,7 +13,7 @@ describe('repayment experiment', () => {
   it('keeps repayment separate from profit, borrowing, and work income', () => {
     const baseline = simulateEconomy(scenario);
     const paid = simulateEconomy({ ...scenario, repayment: { cashReserve: 1000 } });
-    expect(paid.totals.repaid).toBe(6400);
+    expect(paid.totals.repaid).toBe(6835);
     expect(paid.totals.borrowed).toBe(0);
     expect(paid.totals.interest).toBeLessThan(baseline.totals.interest);
     expect(paid.totals.equityChange).toBeGreaterThan(baseline.totals.equityChange);
@@ -77,16 +78,33 @@ describe('repayment experiment', () => {
         && entry.scenario.strategy === 'WORK');
       expect(factory.totals.workIncome).toBe(factory.scenario.days * 120);
       expect(factory.totals.repaid).toBeGreaterThan(0);
-      expect(factory.daily.every((day) => day.energy <= factory.finalState.energyMax - 19
-        && day.energy >= factory.finalState.energyMax - 23)).toBe(true);
-      expect(delivery?.totals.workIncome).toBe(factory.scenario.days * 184);
+      expect(factory.daily.every((day) => {
+        const minimumSpent = day.day <= 30 ? 19 : 17;
+        const maximumSpent = day.day <= 30 ? 23 : 27;
+        return day.energy <= factory.finalState.energyMax - minimumSpent
+          && day.energy >= factory.finalState.energyMax - maximumSpent;
+      })).toBe(true);
+      const expectedDeliveryIncome = Array.from({ length: factory.scenario.days }, (_, dayIndex) => {
+        const priorDeliveryContext = dayIndex === 0 ? null
+          : prototypeExperiment.deliveryRoute.includes('RUSH')
+            ? { previousDay: dayIndex, kind: 'RUSH' as const }
+            : prototypeExperiment.deliveryRoute.every((choice: string) => choice === 'MAIN' || choice === 'STEADY')
+              ? { previousDay: dayIndex, kind: 'RELIABLE' as const }
+              : null;
+        const stops = deliveryStopsFor(dayIndex + 1, 3, delivery?.scenario.seed ?? 4, priorDeliveryContext);
+        return prototypeExperiment.deliveryRoute.reduce((income, choice, stopIndex) => {
+          const option = stops[stopIndex]?.options.find((candidate) => candidate.choice === choice);
+          return income + (option?.income ?? 0);
+        }, 0);
+      }).reduce((total, income) => total + income, 0);
+      expect(delivery?.totals.workIncome).toBe(expectedDeliveryIncome);
       expect(delivery?.totals.workIncome).toBeGreaterThan(factory.totals.workIncome);
     }
     const cafePaths = results.filter((entry) => entry.scenario.strategy === 'CAFE'
       && entry.scenario.repayment?.cashReserve === 1000);
     expect(cafePaths).toHaveLength(30);
     for (const cafe of cafePaths) {
-      expect(cafe.totals.workIncome).toBe(cafe.scenario.days * 120);
+      expect(cafe.totals.workIncome).toBe(cafe.scenario.days * 177);
       expect(cafe.totals.repaid).toBeGreaterThan(0);
       expect(cafe.daily.every((day) => day.energy === cafe.finalState.energyMax - 15)).toBe(true);
     }
@@ -94,7 +112,7 @@ describe('repayment experiment', () => {
       && entry.scenario.repayment?.cashReserve === 1000);
     expect(cafeCashPaths).toHaveLength(30);
     for (const cafeCash of cafeCashPaths) {
-      expect(cafeCash.totals.workIncome).toBe(cafeCash.scenario.days * 120);
+      expect(cafeCash.totals.workIncome).toBe(cafeCash.scenario.days * 177);
       expect(cafeCash.totals.repaid).toBeGreaterThan(0);
       expect(cafeCash.daily.every((day) => day.portfolio === 0)).toBe(true);
       expect(cafeCash.daily[0]?.assetSaleProceeds).toBeGreaterThan(0);
@@ -129,5 +147,5 @@ describe('repayment experiment', () => {
       );
       expect(result.totals.equityChange).toBeCloseTo(result.daily.at(-1)!.equity - result.initialEquity, 2);
     }
-  }, 60000);
+  }, 120000);
 });

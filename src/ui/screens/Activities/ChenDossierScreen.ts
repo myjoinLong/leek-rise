@@ -1,5 +1,6 @@
 import type { GameAction } from '../../../core/reducer';
-import type { CompanyDossierChoice, CompanyDossierConclusion, CompanyDossierEvidence, CompanyDossierResultState, GameState } from '../../../core/types';
+import type { CompanyDossierChoice, CompanyDossierConclusion, CompanyDossierEvidence, CompanyDossierResultState, CompanyDossierState, GameState } from '../../../core/types';
+import { companyDossierScenarioForRun } from '../../../core/systems/companyDossierScenarios';
 
 const choiceLabels: Record<CompanyDossierChoice, string> = {
   VERIFY_FILING: '调取合同备案原件',
@@ -88,10 +89,28 @@ function isConclusion(value: string | undefined): value is CompanyDossierConclus
   return value === 'BUY' || value === 'AVOID' || value === 'WAIT';
 }
 
-function renderEvidence(evidence: CompanyDossierEvidence[]): string {
+function renderEvidence(evidence: CompanyDossierEvidence[], run: CompanyDossierState): string {
+  const scenario = companyDossierScenarioForRun(run);
   return evidence.length === 0 ? '' : '<ol class="cd-evidence">' + evidence.map((record) =>
-    '<li><strong>' + choiceLabels[record.choice] + '</strong><span>' + findings[record.choice][record.finding] + '</span></li>',
+    '<li><strong>' + choiceLabels[record.choice] + '</strong><span>' + escapeHtml(
+      scenario?.recordNotes[record.finding][record.step] ?? findings[record.choice][record.finding],
+    ) + '</span></li>',
   ).join('') + '</ol>';
+}
+
+function renderScenario(run: CompanyDossierState): string {
+  const scenario = companyDossierScenarioForRun(run);
+  const priorReview = run.priorReview
+    ? '<p class="cd-memory">陈总翻开第 ' + run.priorReview.previousDay + ' 天的调查记录：“' +
+      (run.priorReview.conclusion === 'BUY'
+        ? '你当时按合同落地方向继续观察。今天我把合同、交付和回款分开给你看。'
+        : run.priorReview.conclusion === 'AVOID'
+          ? '你当时认为订单有夸大风险。我不拿口头承诺说服你，今天把材料逐项摆出来。'
+          : '你当时觉得证据不足。今天我把来源和日期一起摆出来，你按原始材料判断。') + '”</p>'
+    : '';
+  return scenario
+    ? '<div class="cd-scenario"><strong>' + escapeHtml(scenario.headline) + '</strong><p>' + escapeHtml(scenario.brief) + '</p>' + priorReview + '</div>'
+    : '';
 }
 
 function renderActive(state: GameState): string {
@@ -100,18 +119,18 @@ function renderActive(state: GameState): string {
   if (run.step < 3) {
     const detail = run.step === 0 ? stepDetails[0] : run.step === 1 ? stepDetails[1] : stepDetails[2];
     return '<section class="cd-card"><p class="cd-step">资料核验 ' + (run.step + 1) + ' / 3 · ' + detail.title + '</p>' +
-      '<p class="cd-prompt">' + detail.prompt + '</p><div class="cd-choices">' + detail.choices.map((option) =>
+      renderScenario(run) + '<p class="cd-prompt">' + detail.prompt + '</p><div class="cd-choices">' + detail.choices.map((option) =>
         '<button class="cd-choice" type="button" data-choice="' + option.id + '"' + (state.energy < option.cost ? ' disabled' : '') + '>' +
         '<strong>' + option.label + '</strong><span>' + option.note + '</span></button>',
-      ).join('') + '</div>' + renderEvidence(run.evidence) +
+      ).join('') + '</div>' + renderEvidence(run.evidence, run) +
       '<button class="cd-exit" type="button" data-action="abandon">结束调查并离开</button></section>';
   }
   return '<section class="cd-card"><p class="cd-step">材料已整理 · ' + run.evidence.length + ' / 3</p>' +
-    '<h2>你准备怎么处理这份材料？</h2><div class="cd-choices">' +
+    renderScenario(run) + '<h2>你准备怎么处理这份材料？</h2><div class="cd-choices">' +
     '<button class="cd-choice" type="button" data-conclusion="BUY"><strong>按合同落地的方向继续观察</strong><span>只代表你的判断，不会自动下单。</span></button>' +
     '<button class="cd-choice" type="button" data-conclusion="AVOID"><strong>按订单夸大的方向谨慎处理</strong><span>只代表你的判断，不会自动卖出。</span></button>' +
     '<button class="cd-choice" type="button" data-conclusion="WAIT"><strong>证据不够，暂时不行动</strong><span>保留现金和仓位，等待更多信息。</span></button>' +
-    '</div>' + renderEvidence(run.evidence) + '<button class="cd-exit" type="button" data-action="abandon">结束调查并离开</button></section>';
+    '</div>' + renderEvidence(run.evidence, run) + '<button class="cd-exit" type="button" data-action="abandon">结束调查并离开</button></section>';
 }
 
 function getConfidenceLabel(run: CompanyDossierResultState): string {
@@ -135,8 +154,8 @@ function renderResult(state: GameState): string {
       : run.correct ? '判断方向与多数材料相符' : '判断和核验记录不一致';
   return '<section class="cd-card cd-result"><p class="cd-step">陈总的材料调查回执</p><h2>' +
     heading +
-    '</h2><p>你的处理：' + decision + ' · ' + confidence + '</p><p class="cd-receipt">' + escapeHtml(run.intel.message) + '</p>' +
-    renderEvidence(run.evidence) + '<button class="cd-return" type="button" data-action="return">带着材料结论回街区</button></section>';
+    '</h2>' + renderScenario(run) + '<p>你的处理：' + decision + ' · ' + confidence + '</p><p class="cd-receipt">' + escapeHtml(run.intel.message) + '</p>' +
+    renderEvidence(run.evidence, run) + '<button class="cd-return" type="button" data-action="return">带着材料结论回街区</button></section>';
 }
 
 export function createChenDossierScreen(
@@ -149,20 +168,22 @@ export function createChenDossierScreen(
   const screen = document.createElement('main');
   screen.className = 'cd-screen';
   screen.innerHTML = `<style>
-    .cd-screen{box-sizing:border-box;position:relative;width:100%;height:100vh;height:100dvh;max-width:480px;margin:0 auto;overflow:hidden;background:#17202a;color:#fff0ce;font-family:"Courier New",monospace}
-    .cd-backdrop{position:absolute;inset:0;background:url('/art/pancheng-scenes.png') 50% 0%/auto 200%;image-rendering:pixelated;opacity:.68}
-    .cd-screen:after{position:absolute;inset:0;background:linear-gradient(180deg,rgba(13,18,25,.34),rgba(15,20,27,.44) 32%,rgba(15,20,27,.93));content:"";pointer-events:none}
-    .cd-header,.cd-content{position:absolute;z-index:1;right:12px;left:12px}.cd-header{top:var(--safe-top);padding:11px;border:2px solid #c2a86b;background:rgba(25,30,37,.96);box-shadow:4px 4px #000}
+    .cd-screen{box-sizing:border-box;position:relative;isolation:isolate;width:100%;height:100vh;height:100dvh;max-width:480px;margin:0 auto;overflow:hidden;background:#17202a;color:#fff0ce;font-family:"Courier New",monospace}
+    .cd-backdrop{position:absolute;z-index:0;inset:0;background:url('/art/chen-dossier-archive-v1.webp') center/cover no-repeat;image-rendering:pixelated}
+    .cd-screen:after{position:absolute;z-index:1;inset:0;background:linear-gradient(180deg,rgba(13,18,25,.3),rgba(15,20,27,.28) 34%,rgba(15,20,27,.92));content:"";pointer-events:none}
+    .cd-owner{position:absolute;z-index:2;top:calc(var(--safe-top) + 24%);right:11%;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px;border:1px solid #c2a86b;background:rgba(25,30,37,.9);box-shadow:3px 3px #000;color:#fff0ce;font-size:9px;pointer-events:none}.cd-owner-sprite{display:block;width:56px;height:64px;background-image:url('/art/chen-character-v1.webp');background-position:center;background-size:contain;background-repeat:no-repeat;image-rendering:pixelated;filter:drop-shadow(2px 2px 0 #151515)}
+    .cd-header,.cd-content{position:absolute;z-index:3;right:12px;left:12px}.cd-header{top:var(--safe-top);padding:11px;border:2px solid #c2a86b;background:rgba(25,30,37,.96);box-shadow:4px 4px #000}
     .cd-kicker{margin:0 0 5px;color:#efbd69;font-size:10px;letter-spacing:1px}.cd-title{margin:0;color:#fff0c5;font-size:19px}.cd-stats{margin:7px 0 0;color:#d8d1bc;font-size:11px}
-    .cd-content{bottom:calc(var(--safe-bottom) + 12px);max-height:calc(100% - var(--safe-top) - 120px);overflow-y:auto}.cd-card{padding:13px;border:3px solid #d8bd78;background:rgba(29,34,39,.98);box-shadow:5px 5px #000}
+    .cd-content{bottom:calc(var(--safe-bottom) + 12px);max-height:58%;overflow-y:auto;overscroll-behavior:contain}.cd-card{padding:13px;border:3px solid #d8bd78;background:rgba(29,34,39,.98);box-shadow:5px 5px #000}
     .cd-step{margin:0 0 8px;color:#f2c86f;font-size:11px}.cd-prompt,.cd-card h2{margin:0 0 10px;color:#f5e9c6;font-size:13px;line-height:1.5}.cd-card h2{font-size:16px}
+    .cd-scenario{margin:0 0 9px;padding:7px;border-left:2px solid #d3b36c;background:#30363b;color:#f4e5bd;font-size:10px;line-height:1.5}.cd-scenario p{margin:4px 0 0;color:#d6cfbd}.cd-scenario .cd-memory{color:#f1d6a2}
     .cd-choices{display:flex;flex-direction:column;gap:7px}.cd-choice{display:flex;min-height:54px;flex-direction:column;justify-content:center;gap:4px;padding:8px 10px;border:2px solid #9e8d62;background:#41474a;box-shadow:2px 2px #000;color:#fff0c7;text-align:left;font:inherit;cursor:pointer}
     .cd-choice span{color:#d5ceba;font-size:10px}.cd-choice:disabled{opacity:.48;cursor:not-allowed}.cd-choice:active:not(:disabled),.cd-return:active{transform:translate(2px,2px);box-shadow:1px 1px #000}
     .cd-evidence{display:flex;flex-direction:column;gap:5px;margin:10px 0 0;padding:0;list-style:none}.cd-evidence li{display:flex;flex-direction:column;gap:3px;padding:6px;border-left:2px solid #c5a65e;background:#292f34;color:#ded6c2;font-size:10px}.cd-evidence li span{color:#c9c0aa}
     .cd-exit{min-height:44px;margin-top:9px;padding:5px 8px;border:1px solid #756d58;background:transparent;color:#c4bdac;font:10px "Courier New",monospace;cursor:pointer}
     .cd-result h2{font-size:19px}.cd-result p{color:#ded6c2;font-size:11px;line-height:1.55}.cd-receipt{padding:8px;border-left:3px solid #dda95b;background:#34383a}.cd-return{width:100%;min-height:48px;margin-top:8px;border:2px solid #e3ca82;background:#46514b;box-shadow:3px 3px #000;color:#fff4d2;font:bold 12px "Courier New",monospace;cursor:pointer}
-    .cd-choice:focus-visible,.cd-return:focus-visible,.cd-exit:focus-visible{outline:2px solid #ffe28a;outline-offset:2px}@media(max-height:700px){.cd-content{bottom:calc(var(--safe-bottom) + 6px)}.cd-card{padding:9px}.cd-choice{min-height:46px}}
-  </style><div class="cd-backdrop" aria-hidden="true"></div>
+    .cd-choice:focus-visible,.cd-return:focus-visible,.cd-exit:focus-visible{outline:2px solid #ffe28a;outline-offset:2px}@media(max-height:700px){.cd-content{bottom:calc(var(--safe-bottom) + 6px);max-height:53%}.cd-owner{top:calc(var(--safe-top) + 21%)}.cd-owner-sprite{width:48px;height:55px}.cd-card{padding:9px}.cd-choice{min-height:46px}}
+  </style><div class="cd-backdrop" aria-hidden="true"></div><div class="cd-owner" aria-hidden="true"><span class="cd-owner-sprite"></span><b>陈总</b></div>
   <header class="cd-header"><p class="cd-kicker">写字楼 · 支线副本</p><h1 class="cd-title">公司材料调查</h1>
   <p class="cd-stats">第 ${state.day} 天 · 现金 ¥${state.cash.toLocaleString()} · 精力 ${state.energy} · 标的 ${escapeHtml(state.stocks[run.stockId]?.name ?? '未知')}</p></header>
   <section class="cd-content" aria-live="polite">${run.status === 'RESULT' ? renderResult(state) : renderActive(state)}</section>`;

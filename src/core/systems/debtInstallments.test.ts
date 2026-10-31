@@ -32,25 +32,33 @@ describe('disclosed installment fulfillment prototype', () => {
 
   it('settles costs before repayment, preserves equity, and cannot debit twice on re-entry', () => {
     const state = due(signedInstallments());
-    expect(state.cash).toBe(2570);
+    expect(state.cash).toBe(2240);
     expect(state.debt).toBe(17790);
     expect(state.debtInstallmentPlan?.lastReceipt).toEqual({ day: 35, due: 300, paid: 300, shortfall: 0 });
-    expect(state.cash - state.debt).toBe(3200 - 18000 - 330 - 90);
+    expect(state.cash - state.debt).toBe(3200 - 18000 - 660 - 90);
     const replay = gameReducer(state, { type: 'CHANGE_PHASE', phase: 'NIGHT' });
     expect(replay.cash).toBe(state.cash);
     expect(replay.debtInstallmentPlan).toEqual(state.debtInstallmentPlan);
   });
 
+  it('ends the debt crisis when scheduled repayment reaches the confirmed chapter debt cap', () => {
+    const state = due(signedInstallments({ cash: 10000, debt: 3200 }));
+
+    expect(state.debt).toBe(2916);
+    expect(state.debtCrisisStarted).toBe(false);
+    expect(state.debtCrisisRecoveryDay).toBe(35);
+  });
+
   it('partially pays then pauses without extra debt, resumes only by choice, and can cancel', () => {
-    const state = due(signedInstallments({ cash: 430 }));
+    const state = due(signedInstallments({ cash: 760 }));
     expect(state.debtInstallmentPlan).toMatchObject({ status: 'PAUSED', remaining: 8, lastReceipt: { due: 300, paid: 100, shortfall: 200 } });
     expect(state.cash).toBe(0);
     expect(state.debt).toBe(17990);
-    const stillPaused = due({ ...state, cash: 1000 }, 42);
+    const stillPaused = due({ ...state, cash: 1620 }, 42);
     expect(stillPaused.debtInstallmentPlan).toEqual(state.debtInstallmentPlan);
-    expect(stillPaused.cash).toBe(670);
+    expect(stillPaused.cash).toBe(960);
     const resumed = gameReducer(stillPaused, { type: 'RESUME_DEBT_INSTALLMENTS' });
-    expect(due(resumed, 42).cash).toBe(670);
+    expect(due(resumed, 42).cash).toBe(960);
     expect(due(resumed, 49).debtInstallmentPlan?.remaining).toBe(7);
     const cancelled = gameReducer(resumed, { type: 'CANCEL_DEBT_INSTALLMENTS' });
     expect(due(cancelled, 49).debtInstallmentPlan?.status).toBe('CANCELLED');
@@ -85,7 +93,7 @@ describe('disclosed installment fulfillment prototype', () => {
   });
 
   it('preview exposes shortfall and suspension without mutating state or applying manual payments', () => {
-    const signed = signedInstallments({ cash: 430 });
+    const signed = signedInstallments({ cash: 760 });
     const state = { ...signed, debtInstallmentPlan: null, debtNegotiationCompleted: false,
       activeActivity: { id: 'JIUGE_NEGOTIATION', day: 30, status: 'ACTIVE', step: 2,
         decisions: [{ step: 0, choice: 'SHOW_LEDGER' }, { step: 1, choice: 'PROVE_INCOME' }] } } satisfies GameState;

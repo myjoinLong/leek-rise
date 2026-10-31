@@ -20,6 +20,8 @@ function expectedCommission(step: number, index: number): number {
 }
 function play(state: GameState, indices: readonly number[]): GameState {
   let next = gameReducer(state, { type: 'START_LAOLIANG_STALL' });
+  const run = next.activeActivity;
+  if (run?.id === 'LAOLIANG_MARKET_STALL') next = { ...next, activeActivity: { ...run, scenarioVersion: 1 } };
   for (const index of indices) {
     const choice = choices[index];
     if (!choice) throw new Error('Missing stall route choice.');
@@ -83,13 +85,13 @@ describe('market stall prototype economics', () => {
           interest = money(interest + ledger.interest);
           paidCosts = money(paidCosts + cost);
           deferredCosts = money(deferredCosts + ledger.deferred);
-          if (day >= 30) expect(state.debtCrisisStarted).toBe(true);
+          if (day >= 31) expect(state.debtCrisisStarted).toBe(true);
           if (day < 90) state = gameReducer(state, { type: 'ADVANCE_PHASE' });
         }
         expect(state.cash).toBe(money(3200 + totalIncome - paidCosts));
         expect(state.debt).toBe(money(18000 + interest + deferredCosts));
         expect(totalIncome).toBe(route.income * 90);
-        expect(paidCosts).toBe(3960);
+        expect(paidCosts).toBe(6600);
         expect(deferredCosts).toBe(0);
       });
     }

@@ -3,6 +3,7 @@ import { gameReducer } from '../core/reducer';
 import { createInitialState } from '../core/state';
 import { loadSavedGame, saveGame } from './storage';
 import { gameStateSchema, saveVersion } from './schemas';
+import { riskReplaySchema } from './riskReplaySchema';
 
 const store = vi.hoisted(() => ({ value: null as unknown }));
 vi.mock('localforage', () => ({ default: { createInstance: () => ({
@@ -20,7 +21,7 @@ describe('risk replay save compatibility', () => {
 
   it('round trips entry, all decisions, result and return without duplicate energy or cash changes', async () => {
     let state = gameReducer({ ...createInitialState(), phase: 'DAYTIME' }, { type: 'START_RISK_REPLAY' });
-    expect(saveVersion).toBe(18);
+    expect(saveVersion).toBe(27);
     for (const allocation of [25, 100, 0, null]) {
       await saveGame(state);
       const restored = await loadSavedGame();
@@ -40,6 +41,13 @@ describe('risk replay save compatibility', () => {
   it('preserves exit lock and rejects mismatched progress in a corrupted replay', async () => {
     const state = gameReducer({ ...createInitialState(), phase: 'DAYTIME' }, { type: 'START_RISK_REPLAY' });
     expect(gameStateSchema.safeParse({ ...state, activeActivity: { ...state.activeActivity, step: 2 } }).success).toBe(false);
+    if (state.activeActivity?.id !== 'SWEEPER_RISK_REPLAY') throw new Error('Expected active replay.');
+    const legacyRun = { ...state.activeActivity };
+    delete legacyRun.scenarioVersion;
+    delete legacyRun.scenarioSeed;
+    delete legacyRun.scenarioIndex;
+    delete legacyRun.priorBudgetScore;
+    expect(riskReplaySchema.safeParse(legacyRun).success).toBe(true);
     const exited = gameReducer(state, { type: 'ABANDON_RISK_REPLAY' });
     await saveGame(exited);
     expect(await loadSavedGame()).toEqual(exited);

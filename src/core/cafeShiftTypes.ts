@@ -1,5 +1,6 @@
 export type CafeCustomerId = 'RIDER' | 'REGULAR' | 'PARENT';
 export type CafeShiftStep = 0 | 1 | 2;
+export type CafeScenarioVersion = 1 | 2 | 3 | 4;
 export type CafeShiftChoice =
   | 'BLACK_COFFEE' | 'OAT_LATTE' | 'CAKE'
   | 'SUGAR_FREE_LATTE' | 'CARAMEL_MOCHA' | 'SWEET_TEA'
@@ -12,10 +13,19 @@ export interface CafeShiftDecision {
   correct: boolean;
 }
 
+export interface CafeReturnContext {
+  previousDay: number;
+  customerName: string;
+  previousChoice: CafeShiftChoice;
+}
+
 export interface CafeShiftActiveState {
   id: 'SUJIE_CAFE_SHIFT';
   day: number;
   status: 'ACTIVE';
+  scenarioVersion?: CafeScenarioVersion;
+  scenarioSeed?: number;
+  returnContext?: CafeReturnContext | null;
   step: CafeShiftStep;
   decisions: CafeShiftDecision[];
   energySpent: number;

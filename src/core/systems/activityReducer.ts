@@ -7,11 +7,24 @@ import { reduceRiskReplay } from './riskReplay';
 import { reduceLaoLiangStall } from './laoLiangMarketStall';
 import { reduceBrokerNegotiation } from './brokerNegotiation';
 import { reduceZhengBikeRepair } from './zhengBikeRepair';
-import { abandonDeliveryRun } from './deliveryRun';
+import { reducePhoneFlip } from './phoneFlip';
+import { reduceDeliveryRunAction } from './deliveryRun';
+import { reduceLonggeChatAction } from './longgeChat';
+import { reduceStreamRunAction } from './streamRun';
 import type { GameAction } from '../reducer';
 import type { GameState } from '../types';
 
 export function reduceActivityAction(state: GameState, action: GameAction): GameState | null {
+  const deliveryState = reduceDeliveryRunAction(state, action);
+  if (deliveryState) return deliveryState;
+  const longgeState = reduceLonggeChatAction(state, action);
+  if (longgeState) return longgeState;
+  const streamState = reduceStreamRunAction(state, action);
+  if (streamState) return streamState;
+  if (action.type === 'START_PHONE_FLIP' || action.type === 'INSPECT_PHONE_LOT'
+    || action.type === 'RESOLVE_PHONE_LOT' || action.type === 'ABANDON_PHONE_FLIP') {
+    return reducePhoneFlip(state, action);
+  }
   if (action.type === 'START_ZHENG_BIKE_REPAIR' || action.type === 'TEST_BIKE_PART'
     || action.type === 'REPAIR_BIKE_FAULT' || action.type === 'ABANDON_ZHENG_BIKE_REPAIR') {
     return reduceZhengBikeRepair(state, action);
@@ -25,8 +38,6 @@ export function reduceActivityAction(state: GameState, action: GameAction): Game
   const cafeShiftState = reduceCafeShiftAction(state, action);
   if (cafeShiftState) return cafeShiftState;
   switch (action.type) {
-    case 'ABANDON_DELIVERY_RUN':
-      return abandonDeliveryRun(state);
     case 'START_RISK_REPLAY':
     case 'COMMIT_RISK_ALLOCATION':
     case 'ABANDON_RISK_REPLAY':
@@ -37,6 +48,7 @@ export function reduceActivityAction(state: GameState, action: GameAction): Game
     case 'ABANDON_CHEN_DOSSIER':
       return reduceCompanyDossier(state, action);
     case 'START_JIUGE_NEGOTIATION':
+    case 'ASK_JIUGE_HISTORY':
     case 'CHOOSE_JIUGE_NEGOTIATION':
     case 'ABANDON_JIUGE_NEGOTIATION':
       return reduceJiugeNegotiation(state, action);

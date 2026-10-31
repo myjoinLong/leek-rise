@@ -45,6 +45,36 @@ function advance(state: GameState, count: number): GameState {
 }
 
 describe('chart lesson save and economic contract', () => {
+  it('persists a specific previous-mistake review through the active lesson and result', async () => {
+    const baseline = initial();
+    const withMemory: GameState = {
+      ...baseline,
+      day: 2,
+      npcActivityMemory: {
+        ...baseline.npcActivityMemory,
+        bodhisattva: {
+          ...baseline.npcActivityMemory.bodhisattva,
+          lastTrace: {
+            day: 1,
+            activityId: 'BODHISATTVA_CHART_LESSON',
+            choiceKeys: ['RIDE_HIGHER_LOWS', 'WAIT_FOR_VOLUME', 'DOUBLE_POSITION'],
+            outcomeCode: null,
+            cashDelta: null,
+            score: 2,
+          },
+        },
+      },
+    };
+    let state = await restore(gameReducer(withMemory, { type: 'START_CHART_LESSON' }));
+    expect(state.activeActivity).toMatchObject({ priorReview: {
+      previousDay: 1, step: 2, choice: 'DOUBLE_POSITION', signal: 'NARROW_RANGE',
+    } });
+    for (const choice of answers) state = await restore(gameReducer(state, { type: 'ANSWER_CHART_LESSON', choice }));
+    expect(state.activeActivity).toMatchObject({ status: 'RESULT', priorReview: {
+      previousDay: 1, step: 2, choice: 'DOUBLE_POSITION', signal: 'NARROW_RANGE',
+    } });
+  });
+
   it.each(routes)('restores all steps for $choices without paying cash or replaying rewards', async ({ choices }) => {
     const baseline = initial();
     let state = await restore(gameReducer(baseline, { type: 'START_CHART_LESSON' }));

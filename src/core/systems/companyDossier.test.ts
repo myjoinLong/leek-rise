@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { gameReducer } from '../reducer';
 import { createInitialState } from '../state';
 import { createCompanyDossier } from './companyDossier';
+import { companyDossierScenarioAt, companyDossierScenarioIndex } from './companyDossierScenarios';
 import type { GameState } from '../types';
 
 function startDossier(overrides: Partial<GameState> = {}): GameState {
@@ -19,6 +20,86 @@ describe('Chen company dossier', () => {
     expect(createCompanyDossier(1, { ...stock, scriptPhase: 'ACCUMULATE' }).caseType).toBe('NO_CATALYST');
     expect(createCompanyDossier(1, { ...stock, scriptPhase: 'PUMP' }).caseType).toBe('REAL_CONTRACT');
     expect(createCompanyDossier(1, { ...stock, scriptPhase: 'DUMP' }).caseType).toBe('INFLATED_ORDER');
+  });
+
+  it('creates a reproducible, non-repeating first chapter of daily dossier scenarios', () => {
+    const seed = 47;
+    const firstSequence = Array.from({ length: 32 }, (_, index) => companyDossierScenarioIndex(index + 1, seed));
+    const replaySequence = Array.from({ length: 32 }, (_, index) => companyDossierScenarioIndex(index + 1, seed));
+    const otherSeedSequence = Array.from({ length: 32 }, (_, index) => companyDossierScenarioIndex(index + 1, seed + 1));
+    expect(replaySequence).toEqual(firstSequence);
+    expect(otherSeedSequence).not.toEqual(firstSequence);
+
+    const signatures = new Set<string>();
+    for (let day = 1; day <= 16_200; day += 1) {
+      const index = companyDossierScenarioIndex(day, seed);
+      const scenario = companyDossierScenarioAt(index, 'REAL_CONTRACT');
+      const signature = JSON.stringify([scenario.headline, scenario.brief, scenario.recordNotes]);
+      expect(signatures.has(signature)).toBe(false);
+      signatures.add(signature);
+    }
+    expect(signatures.size).toBe(16_200);
+  });
+
+  it('keeps the market script as the source of truth while attaching scenario context', () => {
+    const initial = createInitialState();
+    const stock = initial.stocks.dragon;
+    if (!stock) throw new Error('Initial stock is missing.');
+
+    const active = createCompanyDossier(12, stock, 99);
+    expect(active).toMatchObject({
+      caseType: 'NO_CATALYST',
+      scenarioVersion: 2,
+      scenarioSeed: 99,
+      scenarioIndex: companyDossierScenarioIndex(12, 99),
+    });
+    expect(createCompanyDossier(12, { ...stock, scriptPhase: 'PUMP' }, 99).caseType).toBe('REAL_CONTRACT');
+  });
+
+  it.each(['BUY', 'AVOID', 'WAIT'] as const)('carries the previous %s conclusion into a new dossier without changing the case', (conclusion) => {
+    const initial = createInitialState();
+    const stock = initial.stocks.dragon;
+    if (!stock) throw new Error('Initial stock is missing.');
+    const priorReview = { previousDay: 3, conclusion };
+    const regular = createCompanyDossier(5, stock, initial.scenarioSeed);
+    const remembered = createCompanyDossier(5, stock, initial.scenarioSeed, priorReview);
+    expect(remembered.priorReview).toEqual(priorReview);
+    expect(remembered).toMatchObject({
+      day: regular.day,
+      stockId: regular.stockId,
+      caseType: regular.caseType,
+      scenarioIndex: regular.scenarioIndex,
+    });
+  });
+
+  it('uses the previous conclusion only as saved dialogue context and ignores incomplete history', () => {
+    const initial = createInitialState();
+    const memory = initial.npcActivityMemory.chen;
+    const previousTrace = {
+      day: 2,
+      activityId: 'CHEN_DOSSIER' as const,
+      choiceKeys: ['VERIFY_FILING', 'CHECK_SUPPLIER', 'MATCH_INVOICES'],
+      outcomeCode: 'AVOID',
+      cashDelta: null,
+      score: 3,
+    };
+    const state = startDossier({
+      day: 4,
+      npcActivityMemory: {
+        ...initial.npcActivityMemory,
+        chen: { ...memory, lastTrace: previousTrace },
+      },
+    });
+    expect(state.activeActivity).toMatchObject({ priorReview: { previousDay: 2, conclusion: 'AVOID' } });
+
+    const noDate = startDossier({
+      day: 4,
+      npcActivityMemory: {
+        ...initial.npcActivityMemory,
+        chen: { ...memory, lastTrace: { ...previousTrace, day: undefined } },
+      },
+    });
+    expect(noDate.activeActivity?.id === 'CHEN_DOSSIER' && noDate.activeActivity.priorReview).toBeUndefined();
   });
 
   it('uses verified records to produce high-confidence market information without changing cash', () => {

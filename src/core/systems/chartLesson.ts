@@ -1,6 +1,7 @@
 import type { GameAction } from '../reducer';
-import type { ChartLessonActiveState, ChartLessonChoice, ChartLessonSignal, ChartLessonState, ChartLessonStep } from '../chartLessonTypes';
+import type { ChartLessonActiveState, ChartLessonChoice, ChartLessonReview, ChartLessonSignal, ChartLessonState, ChartLessonStep } from '../chartLessonTypes';
 import type { GameState, MarketIntel, StockState } from '../types';
+import { chartLessonScenarioAt, chartLessonScenarioIndex, chartLessonScenarioVersion } from '../chartLessonScenarios';
 
 export const chartLessonEnergyPerRound = 3;
 export const chartLessonRounds = 3;
@@ -19,12 +20,41 @@ const chartSamples: readonly { signal: ChartLessonSignal; prices: readonly numbe
   { signal: 'NARROW_RANGE', prices: [10, 10.02, 9.99, 10.01, 10.03, 9.98, 10.02, 10.01] },
 ];
 
-export function getChartLessonSample(step: ChartLessonStep): { signal: ChartLessonSignal; prices: readonly number[] } {
-  return chartSamples[step]!;
+export function getChartLessonSample(step: ChartLessonStep, scenarioIndex?: number): { signal: ChartLessonSignal; prices: readonly number[] } {
+  const sample = chartSamples[step]!;
+  if (scenarioIndex === undefined) return sample;
+
+  const scenario = chartLessonScenarioAt(scenarioIndex);
+  const priceRange = Math.max(...sample.prices) - Math.min(...sample.prices);
+  const prices = sample.prices.map((price, pointIndex) => {
+    const phase = (scenario.index % 97) * 0.19 + step * 1.37;
+    const wave = Math.sin((pointIndex + 1) * 1.71 + phase);
+    return Number((price + wave * priceRange * scenario.noiseAmplitude).toFixed(4));
+  });
+  return { ...sample, prices };
 }
 
-export function createChartLesson(day: number, stockId: string): ChartLessonActiveState {
-  return { id: 'BODHISATTVA_CHART_LESSON', day, stockId, status: 'ACTIVE', step: 0, decisions: [], energySpent: 0 };
+export function createChartLesson(
+  day: number,
+  stockId: string,
+  scenarioSeed = 4,
+  priorScore: number | null = null,
+  priorReview?: ChartLessonReview,
+): ChartLessonActiveState {
+  return {
+    id: 'BODHISATTVA_CHART_LESSON',
+    day,
+    stockId,
+    scenarioVersion: chartLessonScenarioVersion,
+    scenarioSeed,
+    scenarioIndex: chartLessonScenarioIndex(day, scenarioSeed),
+    priorScore,
+    ...(priorReview ? { priorReview } : {}),
+    status: 'ACTIVE',
+    step: 0,
+    decisions: [],
+    energySpent: 0,
+  };
 }
 
 function createIntel(day: number, stock: StockState | undefined, score: number): MarketIntel | null {
@@ -40,6 +70,21 @@ function createIntel(day: number, stock: StockState | undefined, score: number):
       ? '近期价格重心走低，图形偏弱；短线反弹不能证明趋势反转，留意自己的风险位。'
       : '近期价格仍在窄幅波动，方向暂不清晰；等待形态确认比猜方向稳妥。';
   return { day, stockId: stock.id, npcName: 'K线菩萨', confidence: 'LOW', bias, message };
+}
+
+function reviewFromTrace(trace: GameState['npcActivityMemory']['bodhisattva']['lastTrace']): ChartLessonReview | undefined {
+  if (trace?.activityId !== 'BODHISATTVA_CHART_LESSON'
+    || trace.day === undefined || !Number.isInteger(trace.day) || trace.day < 1) return undefined;
+
+  for (let index = 0; index < chartLessonRounds; index += 1) {
+    const step = index as ChartLessonStep;
+    const choice = choicesByStep[step]!.find((candidate) => candidate === trace.choiceKeys[index]);
+    if (!choice) return undefined;
+    if (choice !== correctChoices[index]) {
+      return { previousDay: trace.day, step, choice, signal: chartSamples[index]!.signal };
+    }
+  }
+  return undefined;
 }
 
 export function answerChartLesson(
@@ -58,8 +103,13 @@ export function answerChartLesson(
   const completeDecisions = decisions as [typeof decision, typeof decision, typeof decision];
   const score = completeDecisions.filter((entry) => entry.correct).length;
   return {
-    id: run.id, day: run.day, stockId: run.stockId, status: 'RESULT', step: 3,
-    decisions: completeDecisions, energySpent, score, intel: createIntel(run.day, stock, score),
+    ...run,
+    status: 'RESULT',
+    step: 3,
+    decisions: completeDecisions,
+    energySpent,
+    score,
+    intel: createIntel(run.day, stock, score),
   };
 }
 
@@ -67,9 +117,17 @@ export function reduceChartLessonAction(state: GameState, action: GameAction): G
   if (action.type === 'START_CHART_LESSON') {
     if (state.phase !== 'DAYTIME' || state.activeActivity || state.chartLessonVisitedToday
       || state.energy < minimumChartLessonEnergy || !state.stocks[state.selectedStockId]) return state;
+    const previousTrace = state.npcActivityMemory.bodhisattva.lastTrace;
+    const priorScore = previousTrace?.activityId === 'BODHISATTVA_CHART_LESSON' ? previousTrace.score : null;
     return {
       ...state,
-      activeActivity: createChartLesson(state.day, state.selectedStockId),
+      activeActivity: createChartLesson(
+        state.day,
+        state.selectedStockId,
+        state.scenarioSeed,
+        priorScore,
+        reviewFromTrace(previousTrace),
+      ),
       chartLessonVisitedToday: true,
     };
   }

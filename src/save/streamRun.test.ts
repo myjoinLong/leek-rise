@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { gameReducer } from '../core/reducer';
 import { createInitialState } from '../core/state';
 import type { GameState, PlayerGender, StreamChoice } from '../core/types';
+import { streamScenarioFor, streamScenarios } from '../core/streamScenarios';
+import { streamContinuationVariantCount } from '../core/streamScenarioVariants';
+import { streamIncomeRange } from '../core/systems/streamRun';
 import { loadSavedGame, saveGame } from './storage';
 
 const store = vi.hoisted(() => ({ value: null as unknown }));
@@ -43,8 +46,14 @@ async function restore(state: GameState): Promise<GameState> {
 }
 
 function complete(state: GameState, choices: readonly StreamChoice[]): GameState {
-  return choices.reduce((current, choice) => gameReducer(current, { type: 'CHOOSE_STREAM_OPTION', choice }),
-    gameReducer(state, { type: 'START_STREAM_RUN' }));
+  return choices.reduce((current, choice) => gameReducer(current, { type: 'CHOOSE_STREAM_OPTION', choice }), startLegacy(state));
+}
+
+function startLegacy(state: GameState): GameState {
+  const started = gameReducer(state, { type: 'START_STREAM_RUN' });
+  const run = started.activeActivity;
+  if (run?.id !== 'XIAOLIAN_STREAM' || run.status !== 'ACTIVE') throw new Error('Expected an active stream.');
+  return { ...started, activeActivity: { ...run, scenarioVersion: 1 } };
 }
 
 function advance(state: GameState, count: number): GameState {
@@ -56,7 +65,7 @@ describe.each(['MALE', 'FEMALE'] as const)('%s stream receipts across the save b
   it.each(routes)('settles $choices once, preserving cash and reputation separately', async (route) => {
     const baseline = initial(gender);
     const income = route.income * (gender === 'FEMALE' ? 1.2 : 1);
-    let state = await restore(gameReducer(baseline, { type: 'START_STREAM_RUN' }));
+    let state = await restore(startLegacy(baseline));
     for (const [index, choice] of route.choices.entries()) {
       state = await restore(gameReducer(state, { type: 'CHOOSE_STREAM_OPTION', choice }));
       expect(state.energy).toBe(115 - index * 5);
@@ -138,3 +147,102 @@ describe('stream exit and weekly accounting', () => {
     expect(gameReducer({ ...state, energy: 15 }, { type: 'START_STREAM_RUN' }).activeActivity?.status).toBe('ACTIVE');
   });
 });
+
+describe('seeded Xiao Lian daily episodes', () => {
+  it('deals every authored show once in a repeatable seed order', () => {
+    const first = Array.from({ length: streamScenarios.length }, (_, index) => streamScenarioFor(index + 1, 2, 2026));
+    const repeated = Array.from({ length: streamScenarios.length }, (_, index) => streamScenarioFor(index + 1, 2, 2026));
+    const otherSeed = Array.from({ length: streamScenarios.length }, (_, index) => streamScenarioFor(index + 1, 2, 17));
+    expect(streamScenarios).toHaveLength(37);
+    expect(new Set(first.map((scenario) => scenario.id)).size).toBe(streamScenarios.length);
+    expect(first).toEqual(repeated);
+    expect(first.map((scenario) => scenario.id)).not.toEqual(otherSeed.map((scenario) => scenario.id));
+    expect(new Set(first.map((scenario) => `${scenario.topicHeat}/${scenario.claimRisk}/${scenario.proofDemand}/${scenario.urgency}/${scenario.dealFit}`)).size).toBeGreaterThan(10);
+    expect(streamScenarioFor(streamScenarios.length + 1, 2, 2026).id).toBe(first[0]?.id);
+  });
+
+  it('extends new saves with deterministic scenario combinations instead of replaying the authored deck', () => {
+    const horizon = 5000;
+    const first = Array.from({ length: horizon }, (_, index) => streamScenarioFor(index + 1, 3, 2026));
+    const replay = Array.from({ length: horizon }, (_, index) => streamScenarioFor(index + 1, 3, 2026));
+    const legacyDeckIds = new Set(first.slice(0, streamScenarios.length).map((scenario) => scenario.id));
+
+    expect(streamContinuationVariantCount).toBe(4096);
+    expect(new Set(first.map((scenario) => scenario.id)).size).toBe(horizon);
+    expect(first).toEqual(replay);
+    expect(legacyDeckIds.has(first[streamScenarios.length]!.id)).toBe(false);
+    expect(first[streamScenarios.length]!.beats.map((beat) => beat.briefing).join(' ')).not.toBe(
+      first[0]!.beats.map((beat) => beat.briefing).join(' '),
+    );
+  });
+
+  it('keeps each seeded revenue preview aligned with all eight actual play routes', () => {
+    for (const gender of ['MALE', 'FEMALE'] as const) {
+      for (let day = 1; day <= 45; day += 1) {
+        const seed = 73;
+        const range = streamIncomeRange(15, gender, day, seed, 3);
+        const incomes: number[] = [];
+        for (const first of ['HONEST_REVIEW', 'HYPE_CLAIM'] as const) {
+          for (const second of ['ANSWER_QUESTIONS', 'REPEAT_CTA'] as const) {
+            for (const third of ['TRANSPARENT_DEAL', 'FAKE_SCARCITY'] as const) {
+              let state = { ...initial(gender), day, scenarioSeed: seed };
+              state = gameReducer(state, { type: 'START_STREAM_RUN' });
+              for (const choice of [first, second, third]) state = gameReducer(state, { type: 'CHOOSE_STREAM_OPTION', choice });
+              const run = state.activeActivity;
+              if (run?.id !== 'XIAOLIAN_STREAM' || run.status !== 'RESULT') throw new Error('Expected a completed stream.');
+              incomes.push(run.income);
+              expect(state.cash).toBe(3200 + run.income);
+              expect(state.dailyStreamIncome).toBe(run.income);
+            }
+          }
+        }
+        expect(range, `day ${day}, seed ${seed}, actual ${Math.min(...incomes)}–${Math.max(...incomes)}`)
+          .toEqual({ minimum: Math.min(...incomes), maximum: Math.max(...incomes) });
+      }
+    }
+  });
+
+  it('saves the episode seed and leaves metadata-free legacy runs on their original rules', async () => {
+    let state = gameReducer(initial(), { type: 'START_STREAM_RUN' });
+    expect(state.activeActivity).toMatchObject({ scenarioVersion: 3, scenarioSeed: 17 });
+    const newScenario = state.activeActivity?.id === 'XIAOLIAN_STREAM'
+      ? streamScenarioFor(state.day, state.activeActivity.scenarioVersion, state.activeActivity.scenarioSeed)
+      : null;
+    expect(newScenario?.id).toBe(streamScenarioFor(state.day, 3, 17).id);
+    state = await restore(state);
+    expect(state.activeActivity).toMatchObject({ scenarioVersion: 3, scenarioSeed: 17 });
+
+    const run = state.activeActivity;
+    if (run?.id !== 'XIAOLIAN_STREAM' || run.status !== 'ACTIVE') throw new Error('Expected an active stream.');
+    const { scenarioVersion, scenarioSeed, ...legacyRun } = run;
+    void scenarioVersion;
+    void scenarioSeed;
+    state = { ...state, activeActivity: legacyRun };
+    state = await restore(state);
+    for (const choice of honest) state = gameReducer(state, { type: 'CHOOSE_STREAM_OPTION', choice });
+    expect(state.activeActivity).toMatchObject({ status: 'RESULT', income: 90, audience: 46, trust: 80 });
+  });
+
+  it('keeps saved v2 campaigns on their original repeating deck after v3 ships', async () => {
+    const active = {
+      id: 'XIAOLIAN_STREAM' as const,
+      day: streamScenarios.length + 1,
+      scenarioVersion: 2 as const,
+      scenarioSeed: 17,
+      status: 'ACTIVE' as const,
+      step: 0 as const,
+      audience: 28,
+      trust: 50,
+      salesPoints: 0,
+      energySpent: 0,
+      decisions: [],
+    };
+    const state = await restore({ ...initial(), day: active.day, activeActivity: active, streamedToday: true });
+    expect(state.activeActivity).toEqual(active);
+    expect(streamScenarioFor(active.day, active.scenarioVersion, active.scenarioSeed).id)
+      .toBe(streamScenarioFor(1, 2, active.scenarioSeed).id);
+    expect(streamScenarioFor(active.day, 3, active.scenarioSeed).id)
+      .not.toBe(streamScenarioFor(active.day, 2, active.scenarioSeed).id);
+  });
+});
+

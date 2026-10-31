@@ -1,6 +1,7 @@
 import './styles/trading.css';
 import type { GameAction } from '../../../core/reducer';
 import type { GameState } from '../../../core/types';
+import { marketTickIntervalMs, marketTicksPerDay } from '../../../core/timeRules';
 import { estimateOrderSettlement } from '../../../core/systems/orderBook';
 import { getBrokerTradingFeeRate } from '../../../core/systems/brokerNegotiation';
 import { OrderFeedbackCard } from './components/OrderFeedbackCard';
@@ -33,6 +34,20 @@ export function createTradingScreen(
   screen.className = 'trading-screen scene-screen';
   const topBar = new TopBar();
   const phaseNav = new PhaseNav();
+  const marketClock = document.createElement('div');
+  marketClock.className = 'trading-clock';
+  marketClock.setAttribute('role', 'progressbar');
+  marketClock.setAttribute('aria-label', '本日交易进度');
+  marketClock.setAttribute('aria-valuemin', '0');
+  marketClock.setAttribute('aria-valuemax', String(marketTicksPerDay));
+  const marketClockLabel = document.createElement('span');
+  marketClockLabel.className = 'trading-clock__label';
+  const marketClockTrack = document.createElement('span');
+  marketClockTrack.className = 'trading-clock__track';
+  const marketClockFill = document.createElement('span');
+  marketClockFill.className = 'trading-clock__fill';
+  marketClockTrack.append(marketClockFill);
+  marketClock.append(marketClockLabel, marketClockTrack);
   const scrollArea = document.createElement('div');
   scrollArea.className = 'trading-scroll-area';
   const watchlist = new Watchlist();
@@ -44,7 +59,7 @@ export function createTradingScreen(
   const newsHint = new NewsHint();
   const orderPanel = new OrderPanel();
   scrollArea.append(watchlist.el, stockDetailHeader.el, chartWrapper, tapePanel.el, quoteGrid.el, newsHint.el);
-  screen.append(topBar.el, phaseNav.el, scrollArea, orderPanel.el);
+  screen.append(topBar.el, phaseNav.el, marketClock, scrollArea, orderPanel.el);
 
   const stopTicker = (): void => {
     if (ticker === undefined) return;
@@ -53,7 +68,7 @@ export function createTradingScreen(
   };
 
   const syncTicker = (): void => {
-    if (!screenActive || gameState.phase !== 'TRADING') {
+    if (!screenActive || gameState.phase !== 'TRADING' || document.visibilityState === 'hidden') {
       stopTicker();
       return;
     }
@@ -64,12 +79,19 @@ export function createTradingScreen(
         return;
       }
       dispatch({ type: 'ADVANCE_TICK' });
-    }, 3000);
+    }, marketTickIntervalMs);
   };
+
+  const handleVisibilityChange = (): void => syncTicker();
 
   const render = (): void => {
     if (!screenActive) return;
     const selected = selectTradingVM(gameState, leverageOn ? 2 : 1);
+    const tickCount = gameState.marketTicksThisDay;
+    marketClock.setAttribute('aria-valuenow', String(tickCount));
+    marketClock.setAttribute('aria-valuetext', `${tickCount} / ${marketTicksPerDay} 个 Tick，达到上限后自动收盘`);
+    marketClockLabel.textContent = `行情 ${tickCount}/${marketTicksPerDay} Tick`;
+    marketClockFill.style.transform = `scaleX(${tickCount / marketTicksPerDay})`;
     const selectedStock = gameState.stocks[gameState.selectedStockId];
     const validLot = Number.isInteger(gameState.inputShares)
       && gameState.inputShares >= 100
@@ -131,8 +153,20 @@ export function createTradingScreen(
   };
 
   const dispatch = (action: GameAction): void => {
+    const previousPhase = gameState.phase;
     gameState = sendAction(action);
+    if (previousPhase === 'TRADING' && gameState.phase !== 'TRADING') deactivate();
     render();
+  };
+
+  const deactivate = (): void => {
+    if (!screenActive) return;
+    screenActive = false;
+    stopTicker();
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    feedbackCard?.dismiss();
+    chart?.destroy();
+    chart = null;
   };
 
   const handlers: TradingHandlers = {
@@ -168,10 +202,7 @@ export function createTradingScreen(
       });
     },
     onSkipDay: (): void => {
-      screenActive = false;
-      stopTicker();
-      feedbackCard?.dismiss();
-      chart?.destroy();
+      deactivate();
       gameState = sendAction({ type: 'ADVANCE_PHASE' });
     },
     onDismissFeedback: (): void => {
@@ -181,6 +212,7 @@ export function createTradingScreen(
 
   orderPanel.bind(handlers);
   watchlist.onSelect = handlers.onSelectStock;
+  document.addEventListener('visibilitychange', handleVisibilityChange);
   render();
   void mountChart();
   return screen;

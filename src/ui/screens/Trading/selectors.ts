@@ -16,6 +16,8 @@ export function selectTradingVM(state: GameState, leverage = 1): TradingVM {
     return {
       id: stock.id,
       name: stock.name,
+      symbol: stock.symbol,
+      sector: stock.sector,
       price: stock.price,
       changePct: changePct(stock.price, reference),
       isHalted: false,
@@ -45,7 +47,7 @@ export function selectTradingVM(state: GameState, leverage = 1): TradingVM {
         time: state.marketIntel.confidence === 'HIGH' ? '较高可信' : state.marketIntel.confidence === 'LOW' ? '有限线索' : '待核实',
         text: state.marketIntel.message,
       }
-      : { npcName: '龙哥', time: '07:45', text: '龙科科技，我自己先干了。' },
+      : { npcName: '龙哥', time: '07:45', text: `${selected.name}，我自己先干了。` },
   } : null;
   const maxShares = selected
     ? maxAffordableBuyShares(state.cash, selected, leverage, getBrokerTradingFeeRate(state.brokerContract, state.day))

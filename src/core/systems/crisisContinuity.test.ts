@@ -12,19 +12,43 @@ function advance(state: GameState, count: number): GameState {
 }
 
 describe('day-30 crisis continuity', () => {
+  it('exits the retained crisis after debt is reduced to the confirmed first-chapter limit', () => {
+    let state: GameState = {
+      ...createInitialState(),
+      day: 31,
+      phase: 'NIGHT',
+      cash: 500,
+      debt: 3500,
+      debtCrisisStarted: true,
+    };
+
+    state = gameReducer(state, { type: 'REPAY_DEBT', amount: 400 });
+    expect(state).toMatchObject({ cash: 100, debt: 3100, debtCrisisStarted: true });
+
+    state = gameReducer(state, { type: 'REPAY_DEBT', amount: 100 });
+    expect(state).toMatchObject({ cash: 0, debt: 3000, debtCrisisStarted: false, debtCrisisRecoveryDay: 31 });
+
+    state = gameReducer(state, { type: 'ADVANCE_PHASE' });
+    expect(state).toMatchObject({ day: 32, phase: 'PRE_MARKET', debtCrisisStarted: false, debtCrisisRecoveryDay: 31 });
+  });
+
   it('keeps the save playable through crisis, an earned negotiation, night repayment, and day 32', () => {
     let state: GameState = { ...createInitialState(), day: 29, phase: 'TRADING', gender: 'MALE', energy: 120, energyMax: 120 };
     state = advance(state, 2);
     expect(state).toMatchObject({ day: 30, phase: 'PRE_MARKET', debtCrisisStarted: false });
 
     state = advance(state, 3);
-    expect(state).toMatchObject({ day: 30, phase: 'NIGHT', debtCrisisStarted: true, debt: 18000 });
+    expect(state).toMatchObject({ day: 30, phase: 'NIGHT', debtCrisisStarted: false, debt: 18000 });
 
-    state = advance(state, 2);
+    state = advance(state, 1);
+    expect(state).toMatchObject({ day: 31, phase: 'PRE_MARKET', debtCrisisStarted: true });
+    state = advance(state, 1);
     expect(state).toMatchObject({ day: 31, phase: 'DAYTIME', debtCrisisStarted: true });
     state = gameReducer(state, { type: 'START_FACTORY_SHIFT' });
     for (let step = 0; step < 3; step += 1) {
-      const inspection = factoryInspectionForDay(state.day, step);
+      const run = state.activeActivity;
+      if (!run || run.id !== 'WANG_FACTORY') throw new Error('Factory run was not started.');
+      const inspection = factoryInspectionForDay(state.day, step, run.scenarioVersion ?? 1, run.scenarioSeed ?? 4);
       state = gameReducer(state, { type: 'CHOOSE_FACTORY_CHECK', choice: inspection.correctChoice });
     }
     state = gameReducer(state, { type: 'RETURN_FROM_ACTIVITY' });

@@ -141,15 +141,14 @@ export class OrderPanel implements Component<TradingVM> {
     this.leverageStatusEl.textContent = state.leverageAvailable ? '' : '融资账务未开放';
 
     if (estimates) {
-      const feeLabel = `${(feeRate * 100).toFixed(2)}% 综合费率`;
-      this.buyEstimateEl.textContent = `预计买入支出 ¥${moneyFormatter.format(Math.abs(estimates.buy.cashDelta))}（费用 ¥${moneyFormatter.format(estimates.buy.fee)} · ${feeLabel}）`;
-      this.sellEstimateEl.textContent = `预计卖出净收 ¥${moneyFormatter.format(estimates.sell.cashDelta)}（费用 ¥${moneyFormatter.format(estimates.sell.fee)} · ${feeLabel}）`;
+      this.buyEstimateEl.textContent = `买入均价 ¥${moneyFormatter.format(estimates.buy.averageFillPrice)} · 支出 ¥${moneyFormatter.format(Math.abs(estimates.buy.cashDelta))} · 费用 ¥${moneyFormatter.format(estimates.buy.fee)}`;
+      this.sellEstimateEl.textContent = `卖出均价 ¥${moneyFormatter.format(estimates.sell.averageFillPrice)} · 净收 ¥${moneyFormatter.format(estimates.sell.cashDelta)} · 费用 ¥${moneyFormatter.format(estimates.sell.fee)}`;
     } else {
       this.buyEstimateEl.textContent = '买入金额待计算';
       this.sellEstimateEl.textContent = '卖出金额待计算';
     }
-    this.capacityEl.textContent = `可买 ${sharesFormatter.format(state.maxBuyShares)} 股 · 可卖 ${sharesFormatter.format(state.maxSellShares)} 股`;
-    this.partialFillNoteEl.textContent = '部分成交概率 15%，余量自动撤单';
+    this.capacityEl.textContent = `综合费率 ${(feeRate * 100).toFixed(2)}% · 可买 ${sharesFormatter.format(state.maxBuyShares)} 股 · 可卖 ${sharesFormatter.format(state.maxSellShares)} 股`;
+    this.partialFillNoteEl.textContent = '按当前盘口估算 · 部分成交概率 15%，余量自动撤单';
 
     const quantityIsValid = Number.isInteger(state.inputShares)
       && state.inputShares >= 100

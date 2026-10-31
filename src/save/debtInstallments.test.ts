@@ -32,7 +32,7 @@ describe('installment save version 13', () => {
   it('restores the signing receipt and paused state without signing or repaying twice', async () => {
     let state = sign();
     await saveGame(state);
-    expect(saveVersion).toBe(18);
+    expect(saveVersion).toBe(27);
     let restored = await loadSavedGame();
     expect(restored).toEqual(state);
     if (!restored) throw new Error('Expected saved contract.');

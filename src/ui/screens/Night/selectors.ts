@@ -1,4 +1,5 @@
 import { isPeriodicSettlementDay, periodicCostPolicy } from '../../../core/systems/periodicCosts';
+import { chapterForDay, fixedOperatingCostMultiplierForDay } from '../../../core/chapterRules';
 import type { GameState } from '../../../core/types';
 import { createMockNightVM } from './mock';
 import type { NightVM } from './types';
@@ -19,9 +20,17 @@ export function selectNightVM(state: GameState): NightVM {
   const warnings = state.debt > assets ? ['负债已超过总资产，请留意强平线'] : [];
   if (state.periodicCostLedger.deferred > 0) warnings.push(`本周固定费用有 ¥${state.periodicCostLedger.deferred.toLocaleString()} 未付，已计入负债。`);
   const contract = state.brokerContract;
+  const chapter = chapterForDay(state.day);
   return {
     ...mock,
     day: state.day,
+    chapter: {
+      number: chapter.number,
+      title: chapter.title,
+      startDay: chapter.startDay,
+      endDay: chapter.endDay,
+      fixedCostMultiplier: fixedOperatingCostMultiplierForDay(state.day),
+    },
     cash: state.cash,
     debt: state.debt,
     fame: state.fame,
@@ -36,6 +45,7 @@ export function selectNightVM(state: GameState): NightVM {
     rateRestructureApplied: state.periodicCostLedger.rateRestructureApplied,
     debtRatePlanWeeksRemaining: state.debtRatePlanWeeksRemaining,
     debtCrisisStarted: state.debtCrisisStarted,
+    debtCrisisRecoveredTonight: state.phase === 'NIGHT' && state.debtCrisisRecoveryDay === state.day,
     debtNegotiationCompleted: state.debtNegotiationCompleted,
     warnings,
     brokerageReview: contract ? {

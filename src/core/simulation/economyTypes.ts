@@ -10,6 +10,7 @@ export interface EconomyScenario {
   streamRoute?: readonly StreamChoice[];
   cafe?: { mistakesPerShift: number; skipEveryDays?: number };
   bikeRepair?: { mistakesPerShift: number; skipEveryDays?: number };
+  phoneFlip?: { mistakeEveryDays?: number; skipEveryDays?: number };
   seed?: number;
   repayment?: { cashReserve: number; throughDay?: number };
   resumeInstallmentsOnDays?: readonly number[];
@@ -18,6 +19,7 @@ export interface EconomyScenario {
 
 export interface EconomyDay {
   day: number;
+  debtCrisisStarted: boolean;
   cash: number;
   debt: number;
   portfolio: number;

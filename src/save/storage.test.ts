@@ -22,6 +22,24 @@ beforeEach(() => {
 });
 
 describe('game save migration', () => {
+  it('round-trips an in-progress phone appraisal with its inspection and settled lots', async () => {
+    const { gameReducer } = await import('../core/reducer');
+    let state = gameReducer({ ...createInitialState(), phase: 'DAYTIME' }, { type: 'START_PHONE_FLIP' });
+    state = gameReducer(state, { type: 'INSPECT_PHONE_LOT' });
+    state = gameReducer(state, { type: 'RESOLVE_PHONE_LOT', choice: 'BARGAIN_QUICK' });
+    state = gameReducer(state, { type: 'INSPECT_PHONE_LOT' });
+
+    await saveGame(state);
+    const restored = await loadSavedGame();
+
+    expect(restored).toEqual(state);
+    expect(restored?.activeActivity).toMatchObject({
+      id: 'PHONE_FLIP', status: 'ACTIVE', step: 1, totalProfit: 212, energySpent: 6,
+      decisions: [{ bought: true, purchaseCost: 558, profit: 212 }],
+      inspection: { repairCost: 90, refurbProfitAtAsk: 120 },
+    });
+  });
+
   it('keeps v17 activities readable while reserving Zheng repair activity for v18', async () => {
     const { gameReducer } = await import('../core/reducer');
     const oldState = gameReducer({ ...createInitialState(), phase: 'DAYTIME' }, { type: 'START_FACTORY_SHIFT' });
@@ -151,6 +169,7 @@ describe('game save migration', () => {
     const restored = await loadSavedGame();
 
     expect(restored?.debtCrisisStarted).toBe(false);
+    expect(restored?.debtCrisisRecoveryDay).toBeNull();
   });
 
   it('preserves a version seven crisis and adds the negotiation defaults', async () => {

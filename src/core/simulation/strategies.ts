@@ -3,12 +3,14 @@ import type { GameAction } from '../reducer';
 import type { GameState } from '../types';
 import { getBrokerTradingFeeRate } from '../systems/brokerNegotiation';
 
-export const economyStrategies = ['IDLE', 'WORK', 'FACTORY', 'CAFE', 'STREAM', 'WORK_STREAM', 'FACTORY_STREAM', 'CAFE_STREAM', 'CAFE_CASH', 'WORK_CASH', 'BIKE_REPAIR', 'BIKE_REPAIR_CASH', 'BIKE_REPAIR_STREAM', 'BIKE_REPAIR_CASH_STREAM', 'LOW_FREQUENCY', 'HEAVY', 'BORROW_WORK', 'EXIT'] as const;
+export const economyStrategies = ['IDLE', 'WORK', 'FACTORY', 'CAFE', 'STREAM', 'WORK_STREAM', 'FACTORY_STREAM', 'CAFE_STREAM', 'CAFE_CASH', 'WORK_CASH', 'BIKE_REPAIR', 'BIKE_REPAIR_CASH', 'BIKE_REPAIR_STREAM', 'BIKE_REPAIR_CASH_STREAM', 'PHONE_FLIP', 'PHONE_FLIP_CASH', 'LOW_FREQUENCY', 'HEAVY', 'BORROW_WORK', 'EXIT'] as const;
 export type EconomyStrategy = typeof economyStrategies[number];
 export const bikeRepairStrategies = ['BIKE_REPAIR', 'BIKE_REPAIR_CASH', 'BIKE_REPAIR_STREAM', 'BIKE_REPAIR_CASH_STREAM'] as const;
 export function isBikeRepairStrategy(strategy: EconomyStrategy): boolean { return bikeRepairStrategies.some((candidate) => candidate === strategy); }
 export function isBikeRepairCashStrategy(strategy: EconomyStrategy): boolean { return strategy === 'BIKE_REPAIR_CASH' || strategy === 'BIKE_REPAIR_CASH_STREAM'; }
 export function isBikeRepairStreamingStrategy(strategy: EconomyStrategy): boolean { return strategy === 'BIKE_REPAIR_STREAM' || strategy === 'BIKE_REPAIR_CASH_STREAM'; }
+export function isPhoneFlipStrategy(strategy: EconomyStrategy): boolean { return strategy === 'PHONE_FLIP' || strategy === 'PHONE_FLIP_CASH'; }
+export function isPhoneFlipCashStrategy(strategy: EconomyStrategy): boolean { return strategy === 'PHONE_FLIP_CASH'; }
 
 export function tradingAction(state: GameState, strategy: EconomyStrategy, tick: number): GameAction | null {
   const stock = state.stocks[state.selectedStockId];

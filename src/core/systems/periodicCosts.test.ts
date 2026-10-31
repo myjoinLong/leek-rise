@@ -17,6 +17,17 @@ describe('weekly cost settlement', () => {
     expect(settlePeriodicCosts(settled)).toBe(settled);
   });
 
+  it('doubles fixed operating costs from chapter two without multiplying interest or revenue share', () => {
+    const day35 = { ...createInitialState(), day: 35, weeklyStreamIncome: 2000 };
+    const settled = settlePeriodicCosts(day35);
+    expect(settled.periodicCostLedger).toEqual({
+      interest: 90, rent: 480, membership: 60, equipment: 120, platformShare: 100, deferred: 0,
+      interestGraceApplied: false, rateRestructureApplied: false,
+    });
+    expect(settled.cash).toBe(2440);
+    expect(settled.debt).toBe(18090);
+  });
+
   it('applies platform share to gross stream income and capitalizes unpaid fixed costs', () => {
     const due = {
       ...createInitialState(),
@@ -46,8 +57,8 @@ describe('weekly cost settlement', () => {
     expect(settled.debt).toBe(18000);
     expect(settled.debtInterestGraceWeeksRemaining).toBe(0);
     expect(settled.periodicCostLedger.interestGraceApplied).toBe(true);
-    expect(settled.periodicCostLedger.rent).toBe(240);
-    expect(settled.cash).toBe(2870);
+    expect(settled.periodicCostLedger.rent).toBe(480);
+    expect(settled.cash).toBe(2540);
   });
 
   it('uses the lower rate for eight due settlements and then restores the standard rate', () => {

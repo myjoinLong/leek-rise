@@ -20,6 +20,22 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => htmlEntities[character] ?? character);
 }
 
+export interface SlippagePresentation {
+  showPriceComparison: boolean;
+  warningText: string | null;
+}
+
+export function getSlippagePresentation(slippagePct: number, side: OrderFeedback['side']): SlippagePresentation {
+  const absoluteSlippage = Math.abs(slippagePct);
+  const warningText = absoluteSlippage >= 0.002
+    ? `⚠ ${side === 'BUY' ? '+' : '-'}${(absoluteSlippage * 100).toFixed(1)}%`
+    : null;
+  return {
+    showPriceComparison: absoluteSlippage >= 0.001,
+    warningText,
+  };
+}
+
 export class OrderFeedbackCard implements Component<OrderFeedback> {
   readonly el: HTMLElement;
 
@@ -153,19 +169,18 @@ export class OrderFeedbackCard implements Component<OrderFeedback> {
   }
 
   private renderFilledRows(): string {
-    const showSlippage = Math.abs(this.state.slippagePct) >= 0.001;
-    const priceRow = showSlippage
+    const slippage = getSlippagePresentation(this.state.slippagePct, this.state.side);
+    const priceRow = slippage.showPriceComparison
       ? `委托价 ${this.state.requestedPrice.toFixed(2)} → 成交价 ${this.state.filledPrice.toFixed(2)}`
       : `成交价 ${this.state.filledPrice.toFixed(2)}`;
-    const slipSign = this.state.side === 'BUY' ? '+' : '-';
-    const warning = showSlippage
-      ? `<span class="ofc-warning">⚠ ${slipSign}${(Math.abs(this.state.slippagePct) * 100).toFixed(1)}%</span>`
+    const warning = slippage.warningText
+      ? `<span class="ofc-warning">${slippage.warningText}</span>`
       : '';
     const remaining = this.state.result === 'PARTIAL'
       ? `<div class="ofc-row ofc-remaining">剩余 ${this.state.requestedShares - this.state.filledShares} 股未成交，已自动撤单</div>`
       : '';
-    const latency = this.state.latencyMs > 1200
-      ? '<div class="ofc-row ofc-latency">网络拥堵</div>'
+    const congestion = slippage.warningText || this.state.latencyMs > 1200
+      ? '<div class="ofc-row ofc-latency">下单时网络拥堵，成交价可能与委托价存在偏差</div>'
       : '';
 
     return `
@@ -173,7 +188,7 @@ export class OrderFeedbackCard implements Component<OrderFeedback> {
       ${remaining}
       <div class="ofc-row">交易费用 ¥${this.state.fee.toFixed(2)}</div>
       <div class="ofc-row">到账后现金 ¥${this.state.cashAfter.toLocaleString()}</div>
-      ${latency}
+      ${congestion}
     `;
   }
 

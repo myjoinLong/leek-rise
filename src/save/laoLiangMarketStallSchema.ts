@@ -1,19 +1,24 @@
 import { z } from 'zod';
+import { stallReferralMaxCustomerUnits } from '../core/marketStallTypes';
 
 const productSchema = z.enum(['THERMOS', 'RAINCOAT', 'CABLE']);
 const priceTierSchema = z.enum(['VALUE', 'STANDARD', 'PREMIUM']);
+const returnContextSchema = z.object({ previousDay: z.number().int().positive(), product: productSchema });
 const stepSchema = z.union([z.literal(0), z.literal(1), z.literal(2)]);
 const decisionSchema = z.object({
   step: stepSchema,
   product: productSchema,
   priceTier: priceTierSchema,
   unitPrice: z.number().int().positive(),
-  unitsSold: z.number().int().nonnegative().max(4),
+  unitsSold: z.number().int().nonnegative().max(stallReferralMaxCustomerUnits),
   commission: z.number().int().nonnegative(),
 });
 const base = z.object({
   id: z.literal('LAOLIANG_MARKET_STALL'),
   day: z.number().int().positive(),
+  scenarioVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+  scenarioSeed: z.number().int().nonnegative().max(0xFFFFFFFF).optional(),
+  returnContext: returnContextSchema.optional(),
   energySpent: z.number().int().min(0).max(15),
   decisions: z.array(decisionSchema).max(3),
 });

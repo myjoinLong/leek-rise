@@ -6,11 +6,13 @@ import type {
   CompanyDossierConclusion,
   CompanyDossierEvidence,
   CompanyDossierFinding,
+  CompanyDossierPriorReview,
   CompanyDossierResultState,
   GameState,
   MarketIntel,
   StockState,
 } from '../types';
+import { companyDossierScenarioIndex, companyDossierScenarioVersion } from './companyDossierScenarios';
 
 interface EvidenceOption {
   step: 0 | 1 | 2;
@@ -55,7 +57,12 @@ const findingBySource: Record<CompanyDossierCaseType, Record<CompanyDossierChoic
 
 export const minimumDossierEnergy = 3;
 
-export function createCompanyDossier(day: number, stock: StockState): CompanyDossierActiveState {
+export function createCompanyDossier(
+  day: number,
+  stock: StockState,
+  scenarioSeed = 4,
+  priorReview?: CompanyDossierPriorReview,
+): CompanyDossierActiveState {
   const caseType = stock.scriptPhase === 'PUMP'
     ? 'REAL_CONTRACT'
     : stock.scriptPhase === 'ACCUMULATE' ? 'NO_CATALYST' : 'INFLATED_ORDER';
@@ -64,10 +71,22 @@ export function createCompanyDossier(day: number, stock: StockState): CompanyDos
     day,
     stockId: stock.id,
     caseType,
+    scenarioVersion: companyDossierScenarioVersion,
+    scenarioSeed,
+    scenarioIndex: companyDossierScenarioIndex(day, scenarioSeed),
+    ...(priorReview ? { priorReview } : {}),
     status: 'ACTIVE',
     step: 0,
     evidence: [],
   };
+}
+
+function priorReviewFor(state: GameState): CompanyDossierPriorReview | undefined {
+  const trace = state.npcActivityMemory.chen.lastTrace;
+  if (trace?.activityId !== 'CHEN_DOSSIER' || trace.day === undefined
+    || !Number.isInteger(trace.day) || trace.day < 1 || trace.day >= state.day) return undefined;
+  if (trace.outcomeCode !== 'BUY' && trace.outcomeCode !== 'AVOID' && trace.outcomeCode !== 'WAIT') return undefined;
+  return { previousDay: trace.day, conclusion: trace.outcomeCode };
 }
 
 function getFindingsSummary(evidence: CompanyDossierEvidence[]): string {
@@ -148,7 +167,7 @@ export function reduceCompanyDossier(
       if (state.phase !== 'DAYTIME' || state.activeActivity || state.chenVisitedToday || state.energy < minimumDossierEnergy || !stock) return state;
       return {
         ...state,
-        activeActivity: createCompanyDossier(state.day, stock),
+        activeActivity: createCompanyDossier(state.day, stock, state.scenarioSeed, priorReviewFor(state)),
         chenVisitedToday: true,
       };
     }

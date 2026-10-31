@@ -1,5 +1,12 @@
 export interface NightVM {
   day: number;
+  chapter: {
+    number: 1 | 2 | 3;
+    title: string;
+    startDay: number;
+    endDay: number | null;
+    fixedCostMultiplier: 1 | 2;
+  };
   pnlBreakdown: {
     tradingPnl: number;
     workIncome: number;
@@ -30,6 +37,7 @@ export interface NightVM {
   rateRestructureApplied: boolean;
   debtRatePlanWeeksRemaining: number;
   debtCrisisStarted: boolean;
+  debtCrisisRecoveredTonight: boolean;
   debtNegotiationCompleted: boolean;
   cash: number;
   debt: number;

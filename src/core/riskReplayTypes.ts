@@ -11,9 +11,23 @@ export interface RiskReplayDecision {
   fullPositionPnl: number;
 }
 
+export interface RiskReplayPriorReview {
+  previousDay: number;
+  previousStep: RiskReplayStep;
+  previousAllocation: number;
+  equityBefore: number;
+  stressPercent: number;
+  stressLoss: number;
+}
+
 interface RiskReplayBase {
   id: 'SWEEPER_RISK_REPLAY';
   day: number;
+  scenarioVersion?: 2;
+  scenarioSeed?: number;
+  scenarioIndex?: number;
+  priorBudgetScore?: number | null;
+  priorReview?: RiskReplayPriorReview;
   equity: number;
   energySpent: number;
   decisions: RiskReplayDecision[];

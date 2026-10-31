@@ -4,13 +4,16 @@ const phaseOrder: readonly ScriptPhase[] = ['ACCUMULATE', 'PUMP', 'DISTRIBUTE', 
 const ticksPerPhase = 10;
 const maxHistoryLength = 120;
 
-function getDrift(phase: ScriptPhase, random: number): number {
+function getDrift(phase: ScriptPhase, random: number, volatility = 1): number {
+  const multiplier = Number.isFinite(volatility) ? Math.min(2, Math.max(0.5, volatility)) : 1;
+  let drift: number;
   switch (phase) {
-    case 'ACCUMULATE': return -0.0015 + random * 0.003;
-    case 'PUMP': return -0.0005 + random * 0.004;
-    case 'DISTRIBUTE': return -0.0015 + random * 0.003;
-    case 'DUMP': return -0.0035 + random * 0.004;
+    case 'ACCUMULATE': drift = -0.0015 + random * 0.003; break;
+    case 'PUMP': drift = -0.0005 + random * 0.004; break;
+    case 'DISTRIBUTE': drift = -0.0015 + random * 0.003; break;
+    case 'DUMP': drift = -0.0035 + random * 0.004; break;
   }
+  return drift * multiplier;
 }
 
 function getBuyProbability(phase: ScriptPhase): number {
@@ -58,7 +61,7 @@ function createExternalTrades(
 }
 
 export function tickStock(stock: StockState, rng: () => number): StockState {
-  const drift = getDrift(stock.scriptPhase, rng());
+  const drift = getDrift(stock.scriptPhase, rng(), stock.volatility);
   const price = Math.max(0.01, Number((stock.price * (1 + drift)).toFixed(2)));
   const volumeIncrease = Math.floor(rng() * 1001) + 500;
   const volume = stock.volume + volumeIncrease;

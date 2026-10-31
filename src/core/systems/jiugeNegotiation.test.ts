@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { gameReducer } from '../reducer';
 import { createInitialState } from '../state';
 import type { GameState, JiugeNegotiationChoice } from '../types';
+import { getJiugeNegotiationScenario, getJiugeNegotiationScenarioIndex, jiugeNegotiationScenarioCount } from '../jiugeNegotiationScenarios';
+import { jiugeNegotiationSchema } from '../../save/jiugeNegotiationSchema';
 
 function crisisState(): GameState {
   return { ...createInitialState(), day: 30, phase: 'DAYTIME', debtCrisisStarted: true };
@@ -14,6 +16,65 @@ function finishNegotiation(state: GameState, choices: readonly JiugeNegotiationC
 }
 
 describe('Jiuge debt negotiation activity', () => {
+  it('replays a seed-stable crisis scene and gives each first-chapter day a distinct context', () => {
+    const days = Array.from({ length: jiugeNegotiationScenarioCount }, (_, index) => 30 + index);
+    const sequence = days.map((day) => getJiugeNegotiationScenarioIndex(day, 47));
+    const otherSeed = days.map((day) => getJiugeNegotiationScenarioIndex(day, 48));
+
+    expect(new Set(sequence).size).toBe(jiugeNegotiationScenarioCount);
+    expect(days.map((day) => getJiugeNegotiationScenarioIndex(day, 47))).toEqual(sequence);
+    expect(otherSeed).not.toEqual(sequence);
+    expect(sequence.every((index) => getJiugeNegotiationScenario(index) !== null)).toBe(true);
+  });
+
+  it('stores the selected scene in the activity snapshot without changing negotiation terms', () => {
+    const initial = { ...crisisState(), scenarioSeed: 47, cash: 3300, dailyWorkIncome: 100 };
+    const opened = gameReducer(initial, { type: 'START_JIUGE_NEGOTIATION' });
+    expect(opened.activeActivity).toMatchObject({
+      id: 'JIUGE_NEGOTIATION', scenarioVersion: 2, scenarioSeed: 47,
+      scenarioIndex: getJiugeNegotiationScenarioIndex(initial.day, 47),
+    });
+    expect(jiugeNegotiationSchema.safeParse(opened.activeActivity).success).toBe(true);
+    const legacyRun = {
+      id: 'JIUGE_NEGOTIATION' as const, day: opened.day, status: 'ACTIVE' as const, step: 0 as const, decisions: [],
+    };
+    expect(jiugeNegotiationSchema.safeParse(legacyRun).success).toBe(true);
+
+    const result = gameReducer(opened, { type: 'CHOOSE_JIUGE_NEGOTIATION', choice: 'SHOW_LEDGER' });
+    const advanced = gameReducer(result, { type: 'CHOOSE_JIUGE_NEGOTIATION', choice: 'PROVE_INCOME' });
+    const settled = gameReducer(advanced, { type: 'CHOOSE_JIUGE_NEGOTIATION', choice: 'ASK_INTEREST_GRACE' });
+    expect(settled.activeActivity).toMatchObject({
+      status: 'RESULT', outcome: 'INTEREST_GRACE', scenarioVersion: 2, scenarioSeed: 47,
+      scenarioIndex: getJiugeNegotiationScenarioIndex(initial.day, 47),
+    });
+    expect(jiugeNegotiationSchema.safeParse(settled.activeActivity).success).toBe(true);
+    expect(settled.cash).toBe(initial.cash);
+    expect(settled.debt).toBe(initial.debt);
+    expect(settled.debtInterestGraceWeeksRemaining).toBe(1);
+  });
+
+  it('remembers the optional personal question without changing cash, debt, or negotiation choices', () => {
+    const initial = { ...crisisState(), cash: 3300, dailyWorkIncome: 100 };
+    const opened = gameReducer(initial, { type: 'START_JIUGE_NEGOTIATION' });
+    const asked = gameReducer(opened, { type: 'ASK_JIUGE_HISTORY' });
+
+    expect(asked.activeActivity).toMatchObject({ id: 'JIUGE_NEGOTIATION', status: 'ACTIVE', step: 0, askedAboutHistory: true });
+    expect(asked.cash).toBe(initial.cash);
+    expect(asked.debt).toBe(initial.debt);
+    expect(jiugeNegotiationSchema.safeParse(asked.activeActivity).success).toBe(true);
+    expect(gameReducer(asked, { type: 'ASK_JIUGE_HISTORY' })).toBe(asked);
+
+    const result = gameReducer(asked, { type: 'CHOOSE_JIUGE_NEGOTIATION', choice: 'SHOW_LEDGER' });
+    expect(result.activeActivity).toMatchObject({ step: 1, askedAboutHistory: true });
+    expect(gameReducer(result, { type: 'ASK_JIUGE_HISTORY' })).toBe(result);
+
+    const withIncome = { ...result, dailyWorkIncome: 100 };
+    const proved = gameReducer(withIncome, { type: 'CHOOSE_JIUGE_NEGOTIATION', choice: 'PROVE_INCOME' });
+    const completed = gameReducer(proved, { type: 'CHOOSE_JIUGE_NEGOTIATION', choice: 'SIGN_STANDARD' });
+    expect(jiugeNegotiationSchema.safeParse(completed.activeActivity).success).toBe(true);
+    expect(completed.npcActivityMemory.jiuge.lastTrace?.choiceKeys).toContain('ASK_JIUGE_HISTORY');
+  });
+
   it('earns one disclosed interest grace from ledger and income proof', () => {
     const state = { ...crisisState(), cash: 3300, dailyWorkIncome: 100 };
     const result = finishNegotiation(state, ['SHOW_LEDGER', 'PROVE_INCOME', 'ASK_INTEREST_GRACE']);

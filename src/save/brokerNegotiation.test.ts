@@ -75,6 +75,25 @@ describe('broker negotiation persistence and lifecycle acceptance', () => {
     expect(state.dailyContractFees).toBe(0);
   });
 
+  it('restores an expired contract review through the new negotiation and NPC memory', async () => {
+    const priorContract = {
+      plan: 'LOW_COMMISSION' as const, signedDay: 1, expiresDay: 7, projectedTurnover: 36000 as const,
+      actualTurnover: 10000, discountedFeesPaid: 10, standardFeesEquivalent: 15, serviceFee: 18 as const,
+    };
+    let state = await restore({ ...createInitialState(), day: 8, phase: 'DAYTIME', brokerContract: priorContract });
+    state = await restore(gameReducer(state, { type: 'START_BROKER_NEGOTIATION' }));
+    expect(state.activeActivity).toMatchObject({
+      status: 'ACTIVE', previousReview: { actualTurnover: 10000, netSavingsVsStandard: -13 },
+    });
+    state = await restore(gameReducer(state, { type: 'ESTIMATE_BROKER_TURNOVER', turnover: 10000 }));
+    state = await restore(gameReducer(state, { type: 'CHOOSE_BROKER_PLAN', plan: 'STANDARD' }));
+    expect(state.npcActivityMemory.zhou.lastTrace?.brokerContractReview).toMatchObject({
+      projectedTurnover: 36000, actualTurnover: 10000, netSavingsVsStandard: -13,
+    });
+    state = await restore(gameReducer(state, { type: 'RETURN_FROM_ACTIVITY' }));
+    expect(state.npcActivityMemory.zhou.lastTrace?.brokerContractReview?.netSavingsVsStandard).toBe(-13);
+  });
+
   it.each(Array.from({ length: 15 }, (_, index) => index + 1))('migrates v%s with no invented contract or visit', async (version) => {
     const legacy: Record<string, unknown> = { ...createInitialState(), cash: 1234.56 };
     delete legacy.brokerContract;

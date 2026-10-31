@@ -40,11 +40,12 @@ function renderStockCard(stock: StockCardVM, selected: boolean): string {
     ? `持仓 ${stock.holding.shares} 股 · 盈亏 ${stock.holding.pnlPct.toFixed(1)}%`
     : '未持仓';
   const cardClass = selected ? 'wl-card wl-card--selected' : 'wl-card';
+  const identity = [stock.symbol, stock.sector].filter(Boolean).join(' · ');
 
   return `
     <button class="${cardClass}" type="button" data-id="${escapeHtml(stock.id)}" aria-pressed="${selected}">
       <span class="wl-card-top">
-        <span class="wl-name">${escapeHtml(stock.name)}</span>
+        <span class="wl-name-group"><span class="wl-name">${escapeHtml(stock.name)}</span>${identity ? `<span class="wl-identity">${escapeHtml(identity)}</span>` : ''}</span>
         <span class="wl-market">
           <span class="wl-price">${stock.price.toFixed(2)}</span>
           <span class="wl-change ${directionClass}"><span aria-hidden="true">${arrow}</span><span>${stock.changePct.toFixed(1)}%</span></span>
@@ -101,7 +102,7 @@ export class Watchlist implements Component<TradingVM> {
       ? activeElement.dataset.id
       : undefined;
 
-    this.headingEl.textContent = `我的自选 · ${state.stocks.length}`;
+    this.headingEl.textContent = `盘城市场 · ${state.stocks.length}`;
     this.listEl.innerHTML = state.stocks
       .map((stock) => renderStockCard(stock, stock.id === state.selectedStockId))
       .join('');

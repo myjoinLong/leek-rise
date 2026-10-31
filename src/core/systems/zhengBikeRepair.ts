@@ -1,37 +1,45 @@
-import type { BikeRepairPart, BikeRepairStep, ZhengBikeRepairActiveState, ZhengBikeRepairAction, ZhengBikeRepairState } from '../zhengBikeRepairTypes';
+import type { BikeRepairPart, BikeRepairReturnContext, BikeRepairStep, ZhengBikeRepairActiveState, ZhengBikeRepairAction, ZhengBikeRepairState } from '../zhengBikeRepairTypes';
 import type { GameState } from '../types';
-
-export interface BikeRepairCase {
-  title: string;
-  symptom: string;
-  faultyPart: BikeRepairPart;
-}
+import { zhengBikeRepairCaseFor } from '../zhengBikeRepairScenarios';
+import { zhengRepairReturnContextFor } from '../zhengBikeRepairMemory';
+export { zhengBikeRepairCaseFor, zhengBikeRepairScenarios, zhengBikeRepairScenarioCount } from '../zhengBikeRepairScenarios';
+export type { BikeRepairCase } from '../zhengBikeRepairScenarios';
 
 export const zhengRepairJobs = 3;
 export const zhengRepairEnergyPerJob = 5;
 export const zhengRepairTestEnergy = 2;
-export const zhengRepairBasePay = 18;
+export const zhengRepairBasePay = 48;
 export const zhengRepairQualityBonus = 12;
 export const zhengRepairMinimumEnergy = zhengRepairJobs * zhengRepairEnergyPerJob;
 
-const cases: readonly BikeRepairCase[] = [
-  { title: '通勤车 · 电量异常', symptom: '昨晚刚充满，今天只骑到街口就掉了一格；仪表仍正常亮起。', faultyPart: 'BATTERY' },
-  { title: '配送车 · 后轮异响', symptom: '捏刹车要到底才咬住，低速时后轮还会拖一下。', faultyPart: 'BRAKES' },
-  { title: '改装车 · 颠簸断电', symptom: '经过减速带后动力突然中断，重新开机才能继续走。', faultyPart: 'CONTROLLER' },
-  { title: '通勤车 · 续航骤降', symptom: '充电器很快显示充满，但实际续航比昨天少了一半。', faultyPart: 'BATTERY' },
-  { title: '配送车 · 下坡发热', symptom: '下坡时刹车有刺耳摩擦声，连续制动后手柄发软。', faultyPart: 'BRAKES' },
-  { title: '改装车 · 转把失灵', symptom: '转把偶尔没有响应，仪表短暂闪过控制器错误码。', faultyPart: 'CONTROLLER' },
-];
-
 const parts: readonly BikeRepairPart[] = ['BATTERY', 'BRAKES', 'CONTROLLER'];
 
-export function bikeRepairCaseFor(day: number, step: BikeRepairStep): BikeRepairCase {
-  const index = ((Math.max(1, day) - 1) * zhengRepairJobs + step) % cases.length;
-  return cases[index]!;
+export function bikeRepairCaseFor(
+  day: number,
+  step: BikeRepairStep,
+  version: 1 | 2 | 3 | 4 | 5 = 1,
+  seed = 4,
+  returnContext: BikeRepairReturnContext | null = null,
+) {
+  const scenario = zhengBikeRepairCaseFor(day, step, version, seed);
+  if (step !== 0 || !returnContext) return scenario;
+  const priorOutcome = returnContext.kind === 'MISSED_REPAIR' ? '上次维修判断错了' : '上次修对了，但没有留下检测凭证';
+  const partName = returnContext.faultPart === 'BATTERY' ? '电池组'
+    : returnContext.faultPart === 'BRAKES' ? '刹车系统' : '控制器';
+  return {
+    ...scenario,
+    customerName: returnContext.customerName,
+    customerContext: `这位车主第 ${returnContext.previousDay} 天来过，今天带来新的故障工单。上次的 ${returnContext.issueTitle} 记录还在。`,
+    title: `熟客返修 · ${scenario.title}`,
+    workshopLine: `郑师傅翻开旧工单：“第 ${returnContext.previousDay} 天${priorOutcome}，当时查的是${partName}。今天症状不同，别照搬旧结论；先测出真实故障并把记录留下。”`,
+    testLimit: 1,
+    warrantyProofRequired: true,
+  };
 }
 
-export function bikeRepairTestResult(part: BikeRepairPart, foundFault: boolean): string {
+export function bikeRepairTestResult(part: BikeRepairPart, foundFault: boolean, diagnostic?: string): string {
   if (!foundFault) return '检测值在可用范围内';
+  if (diagnostic) return diagnostic;
   if (part === 'BATTERY') return '电池组压差偏大，负载电压明显下坠';
   if (part === 'BRAKES') return '刹车间隙超标，制动片磨损不均';
   return '控制器报码 E08，供电输出间歇中断';
@@ -39,18 +47,22 @@ export function bikeRepairTestResult(part: BikeRepairPart, foundFault: boolean):
 
 export function bikeRepairCanTest(state: GameState, run: ZhengBikeRepairActiveState, part: BikeRepairPart): boolean {
   const remainingRepairs = (zhengRepairJobs - run.step) * zhengRepairEnergyPerJob;
+  const currentCase = bikeRepairCaseFor(run.day, run.step, run.scenarioVersion ?? 1, run.scenarioSeed ?? 4, run.returnContext ?? null);
+  const currentTests = run.tests.filter((test) => test.step === run.step);
+  const testLimit = currentCase.testLimit ?? parts.length;
   return !run.tests.some((test) => test.step === run.step && test.part === part)
+    && currentTests.length < testLimit
     && state.energy - zhengRepairTestEnergy >= remainingRepairs;
 }
 
-function createRun(day: number): ZhengBikeRepairActiveState {
-  return { id: 'ZHENG_BIKE_REPAIR', day, status: 'ACTIVE', step: 0, energySpent: 0, income: 0, qualityBonus: 0, tests: [], decisions: [] };
+function createRun(day: number, seed: number, returnContext: BikeRepairReturnContext | null): ZhengBikeRepairActiveState {
+  return { id: 'ZHENG_BIKE_REPAIR', day, status: 'ACTIVE', scenarioVersion: 5, scenarioSeed: seed >>> 0, returnContext, step: 0, energySpent: 0, income: 0, qualityBonus: 0, tests: [], decisions: [] };
 }
 
 export function reduceZhengBikeRepair(state: GameState, action: ZhengBikeRepairAction): GameState | null {
   if (action.type === 'START_ZHENG_BIKE_REPAIR') {
     if (state.phase !== 'DAYTIME' || state.workedToday || state.activeActivity || state.energy < zhengRepairMinimumEnergy) return state;
-    return { ...state, workedToday: true, activeActivity: createRun(state.day) };
+    return { ...state, workedToday: true, activeActivity: createRun(state.day, state.scenarioSeed, zhengRepairReturnContextFor(state)) };
   }
 
   const run = state.activeActivity;
@@ -61,7 +73,8 @@ export function reduceZhengBikeRepair(state: GameState, action: ZhengBikeRepairA
 
   if (action.type === 'TEST_BIKE_PART') {
     if (!parts.includes(action.part) || !bikeRepairCanTest(state, run, action.part)) return state;
-    const foundFault = bikeRepairCaseFor(run.day, run.step).faultyPart === action.part;
+    const currentCase = bikeRepairCaseFor(run.day, run.step, run.scenarioVersion ?? 1, run.scenarioSeed ?? 4, run.returnContext ?? null);
+    const foundFault = currentCase.faultyPart === action.part;
     return {
       ...state,
       energy: state.energy - zhengRepairTestEnergy,
@@ -71,10 +84,12 @@ export function reduceZhengBikeRepair(state: GameState, action: ZhengBikeRepairA
 
   if (action.type === 'REPAIR_BIKE_FAULT') {
     if (!parts.includes(action.part) || state.energy < (zhengRepairJobs - run.step) * zhengRepairEnergyPerJob) return state;
-    const correct = bikeRepairCaseFor(run.day, run.step).faultyPart === action.part;
-    const qualityBonus = correct ? zhengRepairQualityBonus : 0;
+    const repairCase = bikeRepairCaseFor(run.day, run.step, run.scenarioVersion ?? 1, run.scenarioSeed ?? 4, run.returnContext ?? null);
+    const correct = repairCase.faultyPart === action.part;
+    const verified = run.tests.some((test) => test.step === run.step && test.part === action.part && test.foundFault);
+    const qualityBonus = correct && (!repairCase.warrantyProofRequired || verified) ? zhengRepairQualityBonus : 0;
     const earned = zhengRepairBasePay + qualityBonus;
-    const decision = { step: run.step, repairedPart: action.part, correct, qualityBonus };
+    const decision = { step: run.step, repairedPart: action.part, correct, qualityBonus, verified };
     const decisions = [...run.decisions, decision];
     const nextRun = {
       ...run,

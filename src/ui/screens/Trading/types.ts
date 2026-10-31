@@ -5,6 +5,8 @@ export type OrderResult = 'FILLED' | 'PARTIAL' | 'REJECTED';
 export interface StockCardVM {
   id: string;
   name: string;
+  symbol?: string;
+  sector?: string;
   price: number;
   changePct: number;
   isHalted: boolean;

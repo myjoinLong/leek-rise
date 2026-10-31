@@ -2,12 +2,14 @@ import { gameReducer } from '../reducer';
 import type { GameAction } from '../reducer';
 import { createInitialState } from '../state';
 import type { GameState } from '../types';
-import { economyStrategies, isBikeRepairCashStrategy, isBikeRepairStreamingStrategy, isBikeRepairStrategy, tradingAction } from './strategies';
+import { economyStrategies, isBikeRepairCashStrategy, isBikeRepairStreamingStrategy, isBikeRepairStrategy, isPhoneFlipCashStrategy, isPhoneFlipStrategy, tradingAction } from './strategies';
 import type { EconomyStrategy } from './strategies';
 import { factoryInspectionForDay, factoryShiftStops } from '../systems/factoryShift';
 import { runCafeStrategy } from './cafeStrategy';
 import { runBikeRepairStrategy } from './bikeRepairStrategy';
+import { runPhoneFlipStrategy } from './phoneFlipStrategy';
 import { validateBikeRepairSettings } from './bikeRepairValidation';
+import { marketTicksPerDay } from '../timeRules';
 import type { EconomyDay, EconomyScenario, EconomySimulation } from './economyTypes';
 export type { EconomyDay, EconomyScenario, EconomySimulation } from './economyTypes';
 
@@ -27,9 +29,9 @@ const equity = (state: GameState): number => money(state.cash + portfolio(state)
 
 export function simulateEconomy(scenario: EconomyScenario): EconomySimulation {
   if (!Number.isInteger(scenario.days) || scenario.days < 1 || scenario.days > 365
-    || !Number.isInteger(scenario.ticksPerDay) || scenario.ticksPerDay < 0 || scenario.ticksPerDay > 600
+    || !Number.isInteger(scenario.ticksPerDay) || scenario.ticksPerDay < 0 || scenario.ticksPerDay > marketTicksPerDay
     || (scenario.seed !== undefined && !Number.isSafeInteger(scenario.seed))) {
-    throw new Error('Simulation requires 1–365 days, 0–600 ticks per day, and a safe-integer seed.');
+    throw new Error(`Simulation requires 1–365 days, 0–${marketTicksPerDay} ticks per day, and a safe-integer seed.`);
   }
   const cafeStrategies: readonly EconomyStrategy[] = ['CAFE', 'CAFE_STREAM', 'CAFE_CASH'];
   if (scenario.cafe && (!cafeStrategies.includes(scenario.strategy)
@@ -39,6 +41,13 @@ export function simulateEconomy(scenario: EconomyScenario): EconomySimulation {
     throw new Error('Cafe stress settings require a cafe strategy, 0–3 mistakes, and an optional 0–365 day skip interval.');
   }
   validateBikeRepairSettings(scenario.bikeRepair, scenario.strategy);
+  if (scenario.phoneFlip && (!isPhoneFlipStrategy(scenario.strategy)
+    || (scenario.phoneFlip.mistakeEveryDays !== undefined && (!Number.isInteger(scenario.phoneFlip.mistakeEveryDays)
+      || scenario.phoneFlip.mistakeEveryDays < 1 || scenario.phoneFlip.mistakeEveryDays > 365))
+    || (scenario.phoneFlip.skipEveryDays !== undefined && (!Number.isInteger(scenario.phoneFlip.skipEveryDays)
+      || scenario.phoneFlip.skipEveryDays < 1 || scenario.phoneFlip.skipEveryDays > 365)))) {
+    throw new Error('Phone appraisal stress settings require a phone-flip strategy and optional 1–365 day intervals.');
+  }
   if (scenario.repayment && (!Number.isFinite(scenario.repayment.cashReserve)
     || scenario.repayment.cashReserve < 0
     || !Number.isSafeInteger(Math.round(scenario.repayment.cashReserve * 100))
@@ -99,7 +108,9 @@ export function simulateEconomy(scenario: EconomyScenario): EconomySimulation {
       dispatch({ type: 'START_FACTORY_SHIFT' });
       if (state.activeActivity?.id !== 'WANG_FACTORY') throw new Error('Factory shift entry was rejected.');
       for (let step = 0; step < factoryShiftStops; step += 1) {
-        const inspection = factoryInspectionForDay(state.day, step);
+        const run = state.activeActivity;
+        if (!run || run.id !== 'WANG_FACTORY') throw new Error('Factory inspection state is missing.');
+        const inspection = factoryInspectionForDay(state.day, step, run.scenarioVersion ?? 1, run.scenarioSeed ?? 4);
         const previous = state;
         dispatch({ type: 'CHOOSE_FACTORY_CHECK', choice: inspection.correctChoice });
         if (previous === state) throw new Error('Factory inspection sequence was rejected.');
@@ -120,8 +131,22 @@ export function simulateEconomy(scenario: EconomyScenario): EconomySimulation {
     if (isBikeRepairStrategy(scenario.strategy)) {
       const skipShift = Boolean(scenario.bikeRepair?.skipEveryDays && day % scenario.bikeRepair.skipEveryDays === 0);
       if (!skipShift) {
-        runBikeRepairStrategy(state, dispatch, scenario.bikeRepair?.mistakesPerShift ?? 0);
+        runBikeRepairStrategy((action) => { dispatch(action); return state; }, scenario.bikeRepair?.mistakesPerShift ?? 0);
         if (state.activeActivity?.id !== 'ZHENG_BIKE_REPAIR' || state.activeActivity.status !== 'RESULT') throw new Error('Bike repair shift did not settle.');
+        dispatch({ type: 'RETURN_FROM_ACTIVITY' });
+      }
+    }
+    if (isPhoneFlipStrategy(scenario.strategy)) {
+      const skipShift = Boolean(scenario.phoneFlip?.skipEveryDays && day % scenario.phoneFlip.skipEveryDays === 0);
+      if (!skipShift) {
+        const misjudgeRiskLot = Boolean(scenario.phoneFlip?.mistakeEveryDays && day % scenario.phoneFlip.mistakeEveryDays === 0);
+        runPhoneFlipStrategy((action) => {
+          dispatch(action);
+          return state;
+        }, { misjudgeRiskLot });
+        if (state.activeActivity?.id !== 'PHONE_FLIP' || state.activeActivity.status !== 'RESULT') {
+          throw new Error('Phone appraisal shift did not settle.');
+        }
         dispatch({ type: 'RETURN_FROM_ACTIVITY' });
       }
     }
@@ -162,7 +187,7 @@ export function simulateEconomy(scenario: EconomyScenario): EconomySimulation {
     }
     dispatch({ type: 'ADVANCE_PHASE' });
     if ((scenario.strategy === 'EXIT' || scenario.strategy === 'WORK_CASH' || scenario.strategy === 'CAFE_CASH'
-      || isBikeRepairCashStrategy(scenario.strategy)) && day === 1) {
+      || isBikeRepairCashStrategy(scenario.strategy) || isPhoneFlipCashStrategy(scenario.strategy)) && day === 1) {
       const saleStart = { cash: state.cash, fees: state.dailyFees };
       for (let attempt = 0; attempt < 20; attempt += 1) {
         const action = tradingAction(state, 'EXIT', 0);
@@ -174,10 +199,11 @@ export function simulateEconomy(scenario: EconomyScenario): EconomySimulation {
     }
     for (let tick = 1; tick <= scenario.ticksPerDay; tick += 1) {
       dispatch({ type: 'ADVANCE_TICK' });
+      if (state.phase !== 'TRADING') break;
       const action = tradingAction(state, scenario.strategy, tick);
       if (action && scenario.strategy !== 'EXIT') dispatch(action);
     }
-    dispatch({ type: 'ADVANCE_PHASE' });
+    if (state.phase === 'TRADING') dispatch({ type: 'ADVANCE_PHASE' });
     if (scenario.repayment && (scenario.repayment.throughDay === undefined || day <= scenario.repayment.throughDay)) {
       const amount = money(Math.min(state.debt, Math.max(0, state.cash - scenario.repayment.cashReserve)));
       if (amount > 0) dispatch({ type: 'REPAY_DEBT', amount });
@@ -203,7 +229,7 @@ export function simulateEconomy(scenario: EconomyScenario): EconomySimulation {
     if (costLedger.interestGraceApplied) totals.interestGraceApplied += 1;
     if (costLedger.rateRestructureApplied) totals.rateRestructureApplied += 1;
     daily.push({
-      day: state.day, cash: state.cash, debt: state.debt, portfolio: portfolio(state), equity: endEquity,
+      day: state.day, debtCrisisStarted: state.debtCrisisStarted, cash: state.cash, debt: state.debt, portfolio: portfolio(state), equity: endEquity,
       equityChange: money(endEquity - dayStart.equity), workIncome: state.dailyWorkIncome,
       activityIncome: state.dailyStreamIncome,
       assetSaleProceeds: dayStart.assetSaleProceeds, fees: state.dailyFees, contractFees: state.dailyContractFees, interest: costLedger.interest,

@@ -12,12 +12,24 @@ export interface BikeRepairDecision {
   repairedPart: BikeRepairPart;
   correct: boolean;
   qualityBonus: number;
+  verified?: boolean;
+}
+
+export interface BikeRepairReturnContext {
+  previousDay: number;
+  customerName: string;
+  issueTitle: string;
+  faultPart: BikeRepairPart;
+  kind: 'MISSED_REPAIR' | 'MISSING_PROOF';
 }
 
 export interface ZhengBikeRepairActiveState {
   id: 'ZHENG_BIKE_REPAIR';
   day: number;
   status: 'ACTIVE';
+  scenarioVersion?: 1 | 2 | 3 | 4 | 5;
+  scenarioSeed?: number;
+  returnContext?: BikeRepairReturnContext | null;
   step: BikeRepairStep;
   energySpent: number;
   income: number;

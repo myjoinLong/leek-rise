@@ -1,6 +1,7 @@
 import type { GameState, JiugeNegotiationAction, JiugeNegotiationActiveState, JiugeNegotiationChoice, JiugeNegotiationResultState, JiugeNegotiationStep, JiugeNegotiationState } from '../types';
 import { periodicCostPolicy } from './periodicCosts';
 import { createDebtInstallmentPlan } from './debtInstallments';
+import { getJiugeNegotiationScenarioIndex } from '../jiugeNegotiationScenarios';
 
 const choicesByStep: Record<JiugeNegotiationStep, readonly JiugeNegotiationChoice[]> = {
   0: ['SHOW_LEDGER', 'BLUFF_CASHFLOW'],
@@ -8,8 +9,11 @@ const choicesByStep: Record<JiugeNegotiationStep, readonly JiugeNegotiationChoic
   2: ['ASK_INTEREST_GRACE', 'SIGN_RATE_RESTRUCTURE', 'SIGN_INSTALLMENTS', 'SIGN_STANDARD'],
 };
 
-function createRun(day: number): JiugeNegotiationActiveState {
-  return { id: 'JIUGE_NEGOTIATION', day, status: 'ACTIVE', step: 0, decisions: [] };
+function createRun(day: number, seed: number): JiugeNegotiationActiveState {
+  return {
+    id: 'JIUGE_NEGOTIATION', day, status: 'ACTIVE', step: 0, decisions: [],
+    scenarioVersion: 2, scenarioSeed: seed, scenarioIndex: getJiugeNegotiationScenarioIndex(day, seed),
+  };
 }
 
 function advanceRun(
@@ -42,6 +46,10 @@ function advanceRun(
     status: 'RESULT',
     step: 3,
     decisions,
+    ...(run.askedAboutHistory ? { askedAboutHistory: true } : {}),
+    ...(run.scenarioVersion !== undefined ? { scenarioVersion: run.scenarioVersion } : {}),
+    ...(run.scenarioSeed !== undefined ? { scenarioSeed: run.scenarioSeed } : {}),
+    ...(run.scenarioIndex !== undefined ? { scenarioIndex: run.scenarioIndex } : {}),
     outcome: hasLedger && hasIncomeProof && choice === 'ASK_INTEREST_GRACE'
       ? 'INTEREST_GRACE'
       : choice === 'SIGN_RATE_RESTRUCTURE' ? 'RATE_RESTRUCTURE' : choice === 'SIGN_INSTALLMENTS' ? 'INSTALLMENTS' : 'STANDARD_TERMS',
@@ -52,7 +60,7 @@ function advanceRun(
 export function reduceJiugeNegotiation(state: GameState, action: JiugeNegotiationAction): GameState {
   if (action.type === 'START_JIUGE_NEGOTIATION') {
     if (state.phase !== 'DAYTIME' || !state.debtCrisisStarted || state.debtNegotiationCompleted || state.activeActivity) return state;
-    return { ...state, activeActivity: createRun(state.day) };
+    return { ...state, activeActivity: createRun(state.day, state.scenarioSeed) };
   }
   const run = state.activeActivity;
   if (!run || run.id !== 'JIUGE_NEGOTIATION') return state;
@@ -60,6 +68,10 @@ export function reduceJiugeNegotiation(state: GameState, action: JiugeNegotiatio
     return run.status === 'ACTIVE' ? { ...state, activeActivity: null } : state;
   }
   if (state.phase !== 'DAYTIME' || run.status !== 'ACTIVE' || run.day !== state.day) return state;
+  if (action.type === 'ASK_JIUGE_HISTORY') {
+    if (run.step !== 0 || run.askedAboutHistory) return state;
+    return { ...state, activeActivity: { ...run, askedAboutHistory: true } };
+  }
   const next = advanceRun(run, action.choice, state);
   if (!next) return state;
   if (next.status !== 'RESULT') return { ...state, activeActivity: next };

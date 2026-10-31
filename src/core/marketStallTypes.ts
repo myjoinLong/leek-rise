@@ -1,6 +1,14 @@
 export type StallProduct = 'THERMOS' | 'RAINCOAT' | 'CABLE';
 export type StallPriceTier = 'VALUE' | 'STANDARD' | 'PREMIUM';
 export type StallStep = 0 | 1 | 2;
+export type StallScenarioVersion = 1 | 2 | 3;
+export const stallMaxCustomerUnits = 10;
+export const stallReferralMaxCustomerUnits = stallMaxCustomerUnits + 1;
+
+export interface LaoLiangReturnContext {
+  previousDay: number;
+  product: StallProduct;
+}
 
 export interface StallDecision {
   step: StallStep;
@@ -14,6 +22,9 @@ export interface StallDecision {
 interface StallRunBase {
   id: 'LAOLIANG_MARKET_STALL';
   day: number;
+  scenarioVersion?: StallScenarioVersion;
+  scenarioSeed?: number;
+  returnContext?: LaoLiangReturnContext;
   energySpent: number;
   decisions: StallDecision[];
 }

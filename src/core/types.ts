@@ -6,40 +6,42 @@ import type { RiskReplayState } from './riskReplayTypes';
 import type { LaoLiangStallState } from './marketStallTypes';
 import type { BrokerNegotiationState, BrokerageContract } from './brokerNegotiationTypes';
 import type { ZhengBikeRepairState } from './zhengBikeRepairTypes';
-export type { BrokerNegotiationAction, BrokerNegotiationState, BrokerPlan, BrokerTurnover, BrokerageContract } from './brokerNegotiationTypes';
+import type { PhoneFlipState } from './phoneFlipTypes';
+import type { StreamReturnContext } from './streamRunTypes';
+import type { NpcActivityMemory } from './npcActivityMemoryTypes';
+import type { OrderBookLevel, TradeRecord } from './marketTypes';
+import type { JiugeNegotiationState } from './jiugeNegotiationTypes';
+import type { LonggeChatState, LonggeConclusion, MarketIntel } from './longgeChatTypes';
+export type { NpcActivityMemory, NpcActivityMemoryEntry, NpcActivityMemoryTrace, NpcId } from './npcActivityMemoryTypes';
+export type { OrderBookLevel, TradeRecord } from './marketTypes';
+export type { BrokerContractReview, BrokerMarketSnapshot, BrokerNegotiationAction, BrokerNegotiationState, BrokerPlan, BrokerTurnover, BrokerageContract } from './brokerNegotiationTypes';
 export type { FactoryShiftAction, FactoryShiftChoice, FactoryShiftDecision, FactoryShiftState } from './factoryShiftTypes';
 export type { ChartLessonAction, ChartLessonChoice, ChartLessonDecision, ChartLessonState, ChartLessonStep } from './chartLessonTypes';
-export type { CafeShiftAction, CafeShiftChoice, CafeShiftDecision, CafeShiftState } from './cafeShiftTypes';
+export type { CafeReturnContext, CafeScenarioVersion, CafeShiftAction, CafeShiftChoice, CafeShiftDecision, CafeShiftState } from './cafeShiftTypes';
 export type { BikeRepairDecision, BikeRepairPart, BikeRepairStep, BikeRepairTest, ZhengBikeRepairAction, ZhengBikeRepairActiveState, ZhengBikeRepairResultState, ZhengBikeRepairState } from './zhengBikeRepairTypes';
+export type { PhoneFlipAction, PhoneFlipChoice, PhoneFlipDecision, PhoneFlipOfferPreview, PhoneFlipReturnContext, PhoneFlipState, PhoneInspection } from './phoneFlipTypes';
+export type { StreamReturnContext } from './streamRunTypes';
+export type { DeliveryReturnContext } from './deliveryReturnTypes';
+export type { LaoLiangReturnContext } from './marketStallTypes';
+export type { JiugeNegotiationAction, JiugeNegotiationActiveState, JiugeNegotiationChoice, JiugeNegotiationDecision, JiugeNegotiationResultState, JiugeNegotiationState, JiugeNegotiationStep } from './jiugeNegotiationTypes';
+export type { LonggeCaseType, LonggeChatActiveState, LonggeChatResultState, LonggeChatState, LonggeClueChoice, LonggeConclusion, LonggeOpeningChoice, MarketIntel } from './longgeChatTypes';
+import type { DeliveryReturnContext } from './deliveryReturnTypes';
 export type GamePhase = 'PRE_MARKET' | 'DAYTIME' | 'TRADING' | 'NIGHT';
 export type ScriptPhase = 'ACCUMULATE' | 'PUMP' | 'DISTRIBUTE' | 'DUMP';
 export type OrderSide = 'BUY' | 'SELL';
 export type PlayerGender = 'MALE' | 'FEMALE';
 export type DeliveryChoice = 'ALLEY' | 'MAIN' | 'RUSH' | 'STEADY';
-export type LonggeClueChoice = 'VERIFY_ORIGIN' | 'FOLLOW_REPOST' | 'READ_TAPE' | 'WATCH_PRICE' | 'CHECK_NOTICE' | 'ASK_GROUP';
-export type LonggeConclusion = 'DISTRIBUTION' | 'REAL_CATALYST' | 'INSUFFICIENT';
-export type LonggeCaseType = 'ACCUMULATION' | 'CATALYST' | 'DISTRIBUTION';
 export type StreamChoice = 'HONEST_REVIEW' | 'HYPE_CLAIM' | 'ANSWER_QUESTIONS' | 'REPEAT_CTA' | 'TRANSPARENT_DEAL' | 'FAKE_SCARCITY';
 export type StreamStep = 0 | 1 | 2;
 export type CompanyDossierChoice = 'VERIFY_FILING' | 'SKIM_PITCH' | 'CHECK_SUPPLIER' | 'ASK_SALES' | 'MATCH_INVOICES' | 'READ_FORECAST';
 export type CompanyDossierConclusion = 'BUY' | 'AVOID' | 'WAIT';
 export type CompanyDossierCaseType = 'REAL_CONTRACT' | 'INFLATED_ORDER' | 'NO_CATALYST';
 export type CompanyDossierFinding = 'CONTRACT' | 'HYPE' | 'NO_CATALYST' | 'UNVERIFIED';
-export type JiugeNegotiationChoice = 'SHOW_LEDGER' | 'BLUFF_CASHFLOW' | 'PROVE_INCOME' | 'PROMISE_FULL' | 'ASK_INTEREST_GRACE' | 'SIGN_RATE_RESTRUCTURE' | 'SIGN_INSTALLMENTS' | 'SIGN_STANDARD';
-export type JiugeNegotiationStep = 0 | 1 | 2;
 export type CompanyDossierAction =
   | { type: 'START_CHEN_DOSSIER' }
   | { type: 'CHOOSE_CHEN_EVIDENCE'; choice: CompanyDossierChoice }
   | { type: 'CONCLUDE_CHEN_DOSSIER'; conclusion: CompanyDossierConclusion }
   | { type: 'ABANDON_CHEN_DOSSIER' };
-export interface MarketIntel {
-  day: number;
-  stockId: string;
-  confidence: 'HIGH' | 'LOW' | 'UNCERTAIN';
-  bias: 'CAUTION' | 'OPPORTUNITY' | 'UNCERTAIN';
-  message: string;
-  npcName?: string;
-}
 export interface DeliveryDecision {
   stopIndex: number;
   choice: DeliveryChoice;
@@ -51,30 +53,14 @@ export interface DeliveryRunState {
   id: 'WANG_DELIVERY';
   day: number;
   status: 'ACTIVE' | 'RESULT';
+  scenarioVersion?: 1 | 2 | 3;
+  scenarioSeed?: number;
+  returnContext?: DeliveryReturnContext;
   stopIndex: number;
   totalIncome: number;
   energySpent: number;
   decisions: DeliveryDecision[];
 }
-export interface LonggeChatActiveState {
-  id: 'LONGGE_CHAT';
-  day: number;
-  caseType: LonggeCaseType;
-  status: 'ACTIVE';
-  step: 0 | 1 | 2 | 3;
-  clues: LonggeClueChoice[];
-}
-export interface LonggeChatResultState {
-  id: 'LONGGE_CHAT';
-  day: number;
-  caseType: LonggeCaseType;
-  status: 'RESULT';
-  clues: LonggeClueChoice[];
-  conclusion: LonggeConclusion;
-  correct: boolean;
-  intel: MarketIntel;
-}
-export type LonggeChatState = LonggeChatActiveState | LonggeChatResultState;
 export interface StreamDecision {
   step: StreamStep;
   choice: StreamChoice;
@@ -85,6 +71,9 @@ export interface StreamDecision {
 export interface StreamRunActiveState {
   id: 'XIAOLIAN_STREAM';
   day: number;
+  scenarioVersion?: 1 | 2 | 3;
+  scenarioSeed?: number;
+  returnContext?: StreamReturnContext;
   status: 'ACTIVE';
   step: StreamStep;
   audience: number;
@@ -96,6 +85,9 @@ export interface StreamRunActiveState {
 export interface StreamRunResultState {
   id: 'XIAOLIAN_STREAM';
   day: number;
+  scenarioVersion?: 1 | 2 | 3;
+  scenarioSeed?: number;
+  returnContext?: StreamReturnContext;
   status: 'RESULT';
   step: 3;
   audience: number;
@@ -112,11 +104,19 @@ export interface CompanyDossierEvidence {
   choice: CompanyDossierChoice;
   finding: CompanyDossierFinding;
 }
+export interface CompanyDossierPriorReview {
+  previousDay: number;
+  conclusion: CompanyDossierConclusion;
+}
 export interface CompanyDossierActiveState {
   id: 'CHEN_DOSSIER';
   day: number;
   stockId: string;
   caseType: CompanyDossierCaseType;
+  scenarioVersion?: 2;
+  scenarioSeed?: number;
+  scenarioIndex?: number;
+  priorReview?: CompanyDossierPriorReview;
   status: 'ACTIVE';
   step: 0 | 1 | 2 | 3;
   evidence: CompanyDossierEvidence[];
@@ -131,19 +131,7 @@ export interface CompanyDossierResultState extends Omit<CompanyDossierActiveStat
   intel: MarketIntel;
 }
 export type CompanyDossierState = CompanyDossierActiveState | CompanyDossierResultState;
-export interface JiugeNegotiationDecision { step: JiugeNegotiationStep; choice: JiugeNegotiationChoice; }
-export interface JiugeNegotiationActiveState {
-  id: 'JIUGE_NEGOTIATION'; day: number; status: 'ACTIVE'; step: JiugeNegotiationStep; decisions: JiugeNegotiationDecision[];
-}
-export interface JiugeNegotiationResultState extends Omit<JiugeNegotiationActiveState, 'status' | 'step'> {
-  status: 'RESULT'; step: 3; outcome: 'INTEREST_GRACE' | 'RATE_RESTRUCTURE' | 'INSTALLMENTS' | 'STANDARD_TERMS';
-}
-export type JiugeNegotiationState = JiugeNegotiationActiveState | JiugeNegotiationResultState;
-export type JiugeNegotiationAction =
-  | { type: 'START_JIUGE_NEGOTIATION' }
-  | { type: 'CHOOSE_JIUGE_NEGOTIATION'; choice: JiugeNegotiationChoice }
-  | { type: 'ABANDON_JIUGE_NEGOTIATION' };
-export type ActiveActivityState = DeliveryRunState | LonggeChatState | StreamRunState | CompanyDossierState | JiugeNegotiationState | FactoryShiftState | ChartLessonState | CafeShiftState | RiskReplayState | LaoLiangStallState | BrokerNegotiationState | ZhengBikeRepairState;
+export type ActiveActivityState = DeliveryRunState | LonggeChatState | StreamRunState | CompanyDossierState | JiugeNegotiationState | FactoryShiftState | ChartLessonState | CafeShiftState | RiskReplayState | LaoLiangStallState | BrokerNegotiationState | ZhengBikeRepairState | PhoneFlipState;
 export interface PeriodicCostLedger {
   interest: number;
   rent: number;
@@ -156,7 +144,9 @@ export interface PeriodicCostLedger {
 }
 export interface GameState {
   day: number;
+  scenarioSeed: number;
   phase: GamePhase;
+  marketTicksThisDay: number;
   cash: number;
   debt: number;
   stocks: Record<string, StockState>;
@@ -176,6 +166,7 @@ export interface GameState {
   periodicCostLedger: PeriodicCostLedger;
   lastPeriodicSettlementDay: number;
   debtCrisisStarted: boolean;
+  debtCrisisRecoveryDay: number | null;
   debtNegotiationCompleted: boolean;
   debtInterestGraceWeeksRemaining: number;
   debtRatePlanWeeksRemaining: number;
@@ -187,12 +178,14 @@ export interface GameState {
   leechLevel: number;
   activeActivity: ActiveActivityState | null;
   marketIntel: MarketIntel | null;
+  longgeLastConclusion: LonggeConclusion | null;
   longgeVisitedToday: boolean;
   chenVisitedToday: boolean;
   chartLessonVisitedToday: boolean;
   riskReplayVisitedToday: boolean;
   brokerContract: BrokerageContract | null;
   brokerNegotiationVisitedToday: boolean;
+  npcActivityMemory: NpcActivityMemory;
 }
 export interface OrderFeedback {
   id: string;
@@ -209,20 +202,12 @@ export interface OrderFeedback {
   rejectReason?: string;
   cashAfter: number;
 }
-export interface TradeRecord {
-  id: string;
-  price: number;
-  shares: number;
-  side: OrderSide;
-  isPlayer: boolean;
-}
-export interface OrderBookLevel {
-  price: number;
-  volume: number;
-}
 export interface StockState {
   id: string;
   name: string;
+  symbol?: string;
+  sector?: string;
+  volatility?: number;
   price: number;
   open: number;
   high: number;

@@ -1,5 +1,19 @@
-export type FactoryShiftChoice = 'REWORK' | 'PASS';
+export type FactoryShiftChoice = 'REWORK' | 'PASS' | 'HOLD';
 export type FactoryShiftStep = 0 | 1 | 2;
+export type FactoryShiftScenarioVersion = 1 | 2 | 3 | 4 | 5;
+
+export interface FactoryReturnContext {
+  previousDay: number;
+  step: FactoryShiftStep;
+  caseTitle: string;
+  choice: FactoryShiftChoice;
+  correctChoice: FactoryShiftChoice;
+  qualityBonusMissed: 20;
+}
+
+export function factoryIsolationAvailable(day: number, scenarioVersion?: FactoryShiftScenarioVersion): boolean {
+  return day > 30 && (scenarioVersion === 3 || scenarioVersion === 4 || scenarioVersion === 5);
+}
 
 export interface FactoryShiftDecision {
   step: FactoryShiftStep;
@@ -12,6 +26,9 @@ export interface FactoryShiftActiveState {
   id: 'WANG_FACTORY';
   day: number;
   status: 'ACTIVE';
+  scenarioVersion?: FactoryShiftScenarioVersion;
+  scenarioSeed?: number;
+  priorReview?: FactoryReturnContext;
   step: FactoryShiftStep;
   qualityBonus: number;
   energySpent: number;

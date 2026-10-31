@@ -31,8 +31,8 @@ describe('read-only debt offer cashflow preview', () => {
         expect(row).toMatchObject({ day: actual.day, cash: actual.cash, debt: actual.debt, interest: actual.periodicCostLedger.interest, repaid: amount });
       }
       expect(preview.cashMinusDebtChange).toBeCloseTo(actual.cash - actual.debt - (state.cash - state.debt), 2);
-      expect(preview.weeks[0]?.operatingCosts).toBe(355);
-      expect(preview.weeks[1]?.operatingCosts).toBe(330);
+      expect(preview.weeks[0]?.operatingCosts).toBe(685);
+      expect(preview.weeks[1]?.operatingCosts).toBe(660);
     }
     expect(state).toEqual(before);
     expect(previewDebtOffers(state, assumptions)).toEqual(previews);
@@ -61,7 +61,7 @@ describe('read-only debt offer cashflow preview', () => {
         debt = row.debt;
       }
     }
-    expect(previews[2]?.weeks[0]?.deferred).toBe(330);
+    expect(previews[2]?.weeks[0]?.deferred).toBe(660);
   });
 
   it('includes a settlement due today and skips one already settled today', () => {
