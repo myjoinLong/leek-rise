@@ -3,7 +3,7 @@ import { gameReducer } from '../reducer';
 import { createInitialState } from '../state';
 import { chartLessonScenarioAt, chartLessonScenarioCount, chartLessonScenarioIndex } from '../chartLessonScenarios';
 import type { GameState } from '../types';
-import { getChartLessonSample, minimumChartLessonEnergy } from './chartLesson';
+import { chartLessonPromptStep, getChartLessonSample, minimumChartLessonEnergy } from './chartLesson';
 
 function start(overrides: Partial<GameState> = {}): GameState {
   return gameReducer({ ...createInitialState(), phase: 'DAYTIME', ...overrides }, { type: 'START_CHART_LESSON' });
@@ -103,6 +103,61 @@ describe('K-line reading lesson', () => {
     });
     expect(state.activeActivity).toMatchObject({
       priorReview: { previousDay: 1, step, choice, signal },
+    });
+  });
+
+  it('prioritizes the previous mistake and maps the saved answer order back to its signal', () => {
+    const initial = createInitialState();
+    const state = start({
+      day: 4,
+      npcActivityMemory: {
+        ...initial.npcActivityMemory,
+        bodhisattva: {
+          ...initial.npcActivityMemory.bodhisattva,
+          lastTrace: {
+            day: 3,
+            activityId: 'BODHISATTVA_CHART_LESSON',
+            choiceKeys: ['RIDE_HIGHER_LOWS', 'WAIT_FOR_VOLUME', 'DOUBLE_POSITION'],
+            chartLessonOrder: [0, 1, 2],
+            outcomeCode: null,
+            cashDelta: null,
+            score: 2,
+          },
+        },
+      },
+    });
+    const active = state.activeActivity;
+    if (active?.id !== 'BODHISATTVA_CHART_LESSON' || active.status !== 'ACTIVE') {
+      throw new Error('Expected an active chart lesson.');
+    }
+    expect(active.lessonOrder).toEqual([2, 0, 1]);
+    expect(chartLessonPromptStep(active)).toBe(2);
+
+    let result = gameReducer(state, { type: 'ANSWER_CHART_LESSON', choice: 'ASSUME_REVERSAL' });
+    expect(result.activeActivity?.id === 'BODHISATTVA_CHART_LESSON'
+      && result.activeActivity.status === 'ACTIVE'
+      && chartLessonPromptStep(result.activeActivity)).toBe(0);
+    result = gameReducer(result, { type: 'ANSWER_CHART_LESSON', choice: 'RIDE_HIGHER_LOWS' });
+    result = gameReducer(result, { type: 'ANSWER_CHART_LESSON', choice: 'WAIT_FOR_VOLUME' });
+    const completed = result.activeActivity;
+    if (completed?.id !== 'BODHISATTVA_CHART_LESSON' || completed.status !== 'RESULT') {
+      throw new Error('Expected the chart lesson to complete.');
+    }
+    expect(completed).toMatchObject({
+      score: 2,
+      lessonOrder: [2, 0, 1],
+      decisions: [{ step: 2 }, { step: 0 }, { step: 1 }],
+    });
+
+    result = gameReducer(result, { type: 'RETURN_FROM_ACTIVITY' });
+    expect(result.npcActivityMemory.bodhisattva.lastTrace).toMatchObject({
+      choiceKeys: ['ASSUME_REVERSAL', 'RIDE_HIGHER_LOWS', 'WAIT_FOR_VOLUME'],
+      chartLessonOrder: [2, 0, 1],
+    });
+    const nextLesson = start({ day: 5, npcActivityMemory: result.npcActivityMemory });
+    expect(nextLesson.activeActivity).toMatchObject({
+      priorReview: { step: 2, choice: 'ASSUME_REVERSAL', signal: 'NARROW_RANGE' },
+      lessonOrder: [2, 0, 1],
     });
   });
 

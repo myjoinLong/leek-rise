@@ -1,6 +1,6 @@
 import type { GameAction } from '../../../core/reducer';
 import type { ChartLessonChoice, ChartLessonSignal, ChartLessonState, ChartLessonStep } from '../../../core/chartLessonTypes';
-import { getChartLessonSample, minimumChartLessonEnergy } from '../../../core/systems/chartLesson';
+import { chartLessonPromptStep, getChartLessonSample, minimumChartLessonEnergy } from '../../../core/systems/chartLesson';
 import { chartLessonScenarioForRun } from '../../../core/chartLessonScenarios';
 import type { GameState } from '../../../core/types';
 
@@ -93,15 +93,17 @@ function renderScenario(run: ChartLessonState): string {
 }
 
 function renderActive(run: Extract<ChartLessonState, { status: 'ACTIVE' }>): string {
-  const prompt = prompts[run.step];
+  const promptStep = chartLessonPromptStep(run);
+  const prompt = prompts[promptStep];
   const history = run.decisions.map((decision, index) => '<li><span>练习 ' + (index + 1) + ' · ' +
     escapeHtml(choiceTitles[decision.choice]) + '</span><strong class="' + (decision.correct ? 'cl-correct' : 'cl-missed') + '">' +
     (decision.correct ? '判断成立' : '再核对线索') + '</strong></li>').join('');
   const options = prompt.options.map((option) => '<button type="button" class="cl-option" data-choice="' + option.choice + '">' +
     '<strong>' + option.title + '</strong><span>' + option.note + '</span><small>精力 -3</small></button>').join('');
-  return '<section class="cl-card"><p class="cl-progress">读图练习 ' + (run.step + 1) + ' / 3 · 已耗精力 ' +
+  const focus = run.priorReview && run.step === 0 ? ' · 优先复习 ' + reviewGuidance[run.priorReview.signal].label : '';
+  return '<section class="cl-card"><p class="cl-progress">读图练习 ' + (run.step + 1) + ' / 3' + focus + ' · 已耗精力 ' +
     run.energySpent + ' / ' + minimumChartLessonEnergy + '</p>' + renderScenario(run) + '<h2>' + prompt.title + '</h2><p class="cl-clue">' + prompt.clue + '</p>' +
-    chartMarkup(run.step, run.scenarioIndex) + '<div class="cl-options">' + options + '</div>' +
+    chartMarkup(promptStep, run.scenarioIndex) + '<div class="cl-options">' + options + '</div>' +
     (history ? '<ol class="cl-history" aria-label="练习记录">' + history + '</ol>' : '') +
     '<p class="cl-clue">练习不发现金。中途离开不生成走势提示，已耗精力不退，今天不能再次练习。</p>' +
     '<button class="cl-quit" type="button" data-action="abandon">结束练习并离开</button></section>';

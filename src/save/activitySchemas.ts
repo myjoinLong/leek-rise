@@ -125,17 +125,22 @@ const chartLessonReviewSchema = z.object({
   choice: chartLessonChoiceSchema,
   signal: z.enum(['HIGHER_LOWS', 'WEAK_BREAKOUT', 'NARROW_RANGE']),
 });
+const chartLessonOrderSchema = z.tuple([
+  z.union([z.literal(0), z.literal(1), z.literal(2)]),
+  z.union([z.literal(0), z.literal(1), z.literal(2)]),
+  z.union([z.literal(0), z.literal(1), z.literal(2)]),
+]).refine((order) => new Set(order).size === 3);
 export const chartLessonSchema = z.discriminatedUnion('status', [
   z.object({ id: z.literal('BODHISATTVA_CHART_LESSON'), day: z.number().int().positive(), stockId: z.string(),
     scenarioVersion: z.literal(2).optional(), scenarioSeed: z.number().int().min(0).max(0xFFFFFFFF).optional(),
     scenarioIndex: z.number().int().min(0).max(2699).optional(), priorScore: z.number().int().min(0).max(3).nullable().optional(),
-    priorReview: chartLessonReviewSchema.optional(),
+    priorReview: chartLessonReviewSchema.optional(), lessonOrder: chartLessonOrderSchema.optional(),
     status: z.literal('ACTIVE'), step: z.union([z.literal(0), z.literal(1), z.literal(2)]),
     decisions: z.array(chartLessonDecisionSchema).max(2), energySpent: z.number().int().min(0).max(6) }),
   z.object({ id: z.literal('BODHISATTVA_CHART_LESSON'), day: z.number().int().positive(), stockId: z.string(),
     scenarioVersion: z.literal(2).optional(), scenarioSeed: z.number().int().min(0).max(0xFFFFFFFF).optional(),
     scenarioIndex: z.number().int().min(0).max(2699).optional(), priorScore: z.number().int().min(0).max(3).nullable().optional(),
-    priorReview: chartLessonReviewSchema.optional(),
+    priorReview: chartLessonReviewSchema.optional(), lessonOrder: chartLessonOrderSchema.optional(),
     status: z.literal('RESULT'), step: z.literal(3), decisions: z.tuple([
       chartLessonDecisionSchema, chartLessonDecisionSchema, chartLessonDecisionSchema,
     ]), energySpent: z.literal(9), score: z.number().int().min(0).max(3), intel: marketIntelSchema.nullable() }),

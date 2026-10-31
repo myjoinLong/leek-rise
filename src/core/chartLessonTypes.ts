@@ -29,6 +29,7 @@ export interface ChartLessonActiveState {
   scenarioIndex?: number;
   priorScore?: number | null;
   priorReview?: ChartLessonReview;
+  lessonOrder?: [ChartLessonStep, ChartLessonStep, ChartLessonStep];
   status: 'ACTIVE';
   step: ChartLessonStep;
   decisions: ChartLessonDecision[];

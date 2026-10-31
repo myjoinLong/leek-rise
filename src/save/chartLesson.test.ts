@@ -12,6 +12,9 @@ vi.mock('localforage', () => ({ default: { createInstance: () => ({
 beforeEach(() => { store.value = null; });
 
 const answers: readonly ChartLessonChoice[] = ['RIDE_HIGHER_LOWS', 'WAIT_FOR_VOLUME', 'WAIT_FOR_RANGE_BREAK'];
+const narrowRangeReviewAnswers: readonly ChartLessonChoice[] = [
+  'WAIT_FOR_RANGE_BREAK', 'RIDE_HIGHER_LOWS', 'WAIT_FOR_VOLUME',
+];
 const options: readonly (readonly ChartLessonChoice[])[] = [
   ['RIDE_HIGHER_LOWS', 'CHASE_LAST_SPIKE', 'SELL_FIRST_PULLBACK'],
   ['WAIT_FOR_VOLUME', 'BUY_ANY_BREAKOUT', 'IGNORE_VOLUME'],
@@ -68,11 +71,18 @@ describe('chart lesson save and economic contract', () => {
     let state = await restore(gameReducer(withMemory, { type: 'START_CHART_LESSON' }));
     expect(state.activeActivity).toMatchObject({ priorReview: {
       previousDay: 1, step: 2, choice: 'DOUBLE_POSITION', signal: 'NARROW_RANGE',
-    } });
-    for (const choice of answers) state = await restore(gameReducer(state, { type: 'ANSWER_CHART_LESSON', choice }));
+    }, lessonOrder: [2, 0, 1] });
+    for (const choice of narrowRangeReviewAnswers) state = await restore(gameReducer(state, { type: 'ANSWER_CHART_LESSON', choice }));
     expect(state.activeActivity).toMatchObject({ status: 'RESULT', priorReview: {
       previousDay: 1, step: 2, choice: 'DOUBLE_POSITION', signal: 'NARROW_RANGE',
-    } });
+    }, lessonOrder: [2, 0, 1], score: 3 });
+    expect(state.activeActivity?.id === 'BODHISATTVA_CHART_LESSON'
+      && state.activeActivity.decisions.map((decision) => decision.step)).toEqual([2, 0, 1]);
+    state = await restore(gameReducer(state, { type: 'RETURN_FROM_ACTIVITY' }));
+    expect(state.npcActivityMemory.bodhisattva.lastTrace).toMatchObject({
+      choiceKeys: narrowRangeReviewAnswers,
+      chartLessonOrder: [2, 0, 1],
+    });
   });
 
   it.each(routes)('restores all steps for $choices without paying cash or replaying rewards', async ({ choices }) => {

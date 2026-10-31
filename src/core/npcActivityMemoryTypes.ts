@@ -15,6 +15,7 @@ export interface NpcActivityMemoryTrace {
   scenarioVersion?: number;
   scenarioSeed?: number;
   scenarioIndex?: number;
+  chartLessonOrder?: [0 | 1 | 2, 0 | 1 | 2, 0 | 1 | 2];
   factoryReturnContext?: FactoryReturnContext;
   sujieRegularCustomerName?: string;
   zhengRepairReturnContext?: BikeRepairReturnContext;

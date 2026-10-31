@@ -6,6 +6,7 @@ import type { GameAction } from './core/reducer';
 import type { GamePhase, GameState } from './core/types';
 import { activityContracts, type ActivityId } from './core/activityContracts';
 import { loadSavedGame, saveGame } from './save/storage';
+import { chenReturnPreviewChoiceFor, chenReturnPreviewLinks, createChenReturnPreviewState } from './ui/screens/Activities/ChenDossierPreview';
 
 const root = document.getElementById('app');
 if (!root) throw new Error('App container #app was not found.');
@@ -23,6 +24,8 @@ const createCampaignSeed = (): number => {
   return Date.now() >>> 0;
 };
 const previewScenario = artPreviewMode ? new URLSearchParams(window.location.search).get('scenario') : null;
+const chenReturnPreviewChoice = chenReturnPreviewChoiceFor(previewScenario);
+if (chenReturnPreviewChoice) state = createChenReturnPreviewState(chenReturnPreviewChoice);
 const requestedActivityPreview = artPreviewMode ? previewParams.get('activity') : null;
 const isActivityId = (value: string | null): value is ActivityId => value !== null && Object.hasOwn(activityContracts, value);
 const previewActivityId = isActivityId(requestedActivityPreview) ? requestedActivityPreview : null;
@@ -50,10 +53,10 @@ if (previewScenario === 'chapter-deadline' || previewScenario === 'debt-crisis-n
 }
 if (previewActivityId) {
   const gender = previewParams.get('gender') === 'FEMALE' ? 'FEMALE' : 'MALE';
-  const selected = gameReducer(createInitialState(4), { type: 'SELECT_CHARACTER', gender });
+  const selected = chenReturnPreviewChoice ? state : gameReducer(createInitialState(4), { type: 'SELECT_CHARACTER', gender });
   const previewState: GameState = {
     ...selected,
-    day: previewActivityId === 'JIUGE_NEGOTIATION' ? 30 : 4,
+    day: previewActivityId === 'JIUGE_NEGOTIATION' ? 30 : chenReturnPreviewChoice ? selected.day : 4,
     phase: 'DAYTIME',
     energy: selected.energyMax,
     debtCrisisStarted: previewActivityId === 'JIUGE_NEGOTIATION' || selected.debtCrisisStarted,
@@ -69,7 +72,6 @@ let saveWarning: string | null = null;
 let resumableSave: GameState | null = null;
 let showStartMenu = false;
 let renderSequence = 0;
-
 const syncSaveNotice = (): void => {
   if (!saveWarning) {
     saveNotice.remove();
@@ -118,7 +120,6 @@ const previewLabels: Record<ActivityId, string> = {
   ZHENG_BIKE_REPAIR: '郑师傅 · 电驴维修',
   PHONE_FLIP: '阿浩 · 手机回收',
 };
-
 const createActivityPreviewList = (): HTMLElement => {
   const screen = document.createElement('main');
   screen.className = 'activity-preview-list';
@@ -129,7 +130,7 @@ const createActivityPreviewList = (): HTMLElement => {
   </style><h1>NPC 副本预览</h1><p>开发预览，不读取或写入存档。点击后从固定初始状态进入副本，刷新页面即可重置。</p>
   <nav aria-label="可预览的 NPC 副本">${(Object.keys(previewLabels) as ActivityId[]).map((id) =>
     `<a href="?artPreview=1&amp;activity=${id}">${previewLabels[id]}</a>`,
-  ).join('')}</nav>`;
+  ).join('')}</nav>${chenReturnPreviewLinks()}`;
   return screen;
 };
 

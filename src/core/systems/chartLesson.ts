@@ -7,6 +7,13 @@ export const chartLessonEnergyPerRound = 3;
 export const chartLessonRounds = 3;
 export const minimumChartLessonEnergy = chartLessonEnergyPerRound * chartLessonRounds;
 
+const defaultLessonOrder: [ChartLessonStep, ChartLessonStep, ChartLessonStep] = [0, 1, 2];
+const reviewLessonOrders: Record<ChartLessonStep, [ChartLessonStep, ChartLessonStep, ChartLessonStep]> = {
+  0: [0, 1, 2],
+  1: [1, 0, 2],
+  2: [2, 0, 1],
+};
+
 const choicesByStep: readonly (readonly ChartLessonChoice[])[] = [
   ['RIDE_HIGHER_LOWS', 'CHASE_LAST_SPIKE', 'SELL_FIRST_PULLBACK'],
   ['WAIT_FOR_VOLUME', 'BUY_ANY_BREAKOUT', 'IGNORE_VOLUME'],
@@ -41,6 +48,9 @@ export function createChartLesson(
   priorScore: number | null = null,
   priorReview?: ChartLessonReview,
 ): ChartLessonActiveState {
+  const lessonOrder: [ChartLessonStep, ChartLessonStep, ChartLessonStep] = priorReview
+    ? [...reviewLessonOrders[priorReview.step]]
+    : [...defaultLessonOrder];
   return {
     id: 'BODHISATTVA_CHART_LESSON',
     day,
@@ -50,11 +60,18 @@ export function createChartLesson(
     scenarioIndex: chartLessonScenarioIndex(day, scenarioSeed),
     priorScore,
     ...(priorReview ? { priorReview } : {}),
+    lessonOrder,
     status: 'ACTIVE',
     step: 0,
     decisions: [],
     energySpent: 0,
   };
+}
+
+export function chartLessonPromptStep(
+  run: Pick<ChartLessonActiveState, 'step' | 'lessonOrder'>,
+): ChartLessonStep {
+  return run.lessonOrder?.[run.step] ?? run.step;
 }
 
 function createIntel(day: number, stock: StockState | undefined, score: number): MarketIntel | null {
@@ -76,12 +93,15 @@ function reviewFromTrace(trace: GameState['npcActivityMemory']['bodhisattva']['l
   if (trace?.activityId !== 'BODHISATTVA_CHART_LESSON'
     || trace.day === undefined || !Number.isInteger(trace.day) || trace.day < 1) return undefined;
 
+  const lessonOrder = trace.chartLessonOrder ?? defaultLessonOrder;
+  if (new Set(lessonOrder).size !== chartLessonRounds || trace.choiceKeys.length !== chartLessonRounds) return undefined;
+
   for (let index = 0; index < chartLessonRounds; index += 1) {
-    const step = index as ChartLessonStep;
+    const step = lessonOrder[index] ?? index as ChartLessonStep;
     const choice = choicesByStep[step]!.find((candidate) => candidate === trace.choiceKeys[index]);
     if (!choice) return undefined;
-    if (choice !== correctChoices[index]) {
-      return { previousDay: trace.day, step, choice, signal: chartSamples[index]!.signal };
+    if (choice !== correctChoices[step]) {
+      return { previousDay: trace.day, step, choice, signal: chartSamples[step]!.signal };
     }
   }
   return undefined;
@@ -92,9 +112,10 @@ export function answerChartLesson(
   choice: ChartLessonChoice,
   stock: StockState | undefined,
 ): ChartLessonState | null {
-  if (!choicesByStep[run.step]?.includes(choice) || run.decisions.some((decision) => decision.step === run.step)) return null;
-  const correct = correctChoices[run.step] === choice;
-  const decision = { step: run.step, choice, correct };
+  const lessonStep = chartLessonPromptStep(run);
+  if (!choicesByStep[lessonStep]?.includes(choice) || run.decisions.some((decision) => decision.step === lessonStep)) return null;
+  const correct = correctChoices[lessonStep] === choice;
+  const decision = { step: lessonStep, choice, correct };
   const decisions = [...run.decisions, decision];
   const energySpent = run.energySpent + chartLessonEnergyPerRound;
   if (run.step < chartLessonRounds - 1) {

@@ -14,6 +14,11 @@ const npcActivityMemoryTraceSchema = z.object({
   scenarioVersion: z.number().int().positive().optional(),
   scenarioSeed: z.number().int().min(0).max(0xFFFFFFFF).optional(),
   scenarioIndex: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+  chartLessonOrder: z.tuple([
+    z.union([z.literal(0), z.literal(1), z.literal(2)]),
+    z.union([z.literal(0), z.literal(1), z.literal(2)]),
+    z.union([z.literal(0), z.literal(1), z.literal(2)]),
+  ]).refine((order) => new Set(order).size === 3).optional(),
   factoryReturnContext: factoryReturnContextSchema.optional(),
   sujieRegularCustomerName: z.string().min(1).max(96).optional(),
   streamScenarioTitle: z.string().min(1).max(160).optional(),

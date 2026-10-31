@@ -65,6 +65,9 @@ export class NightScreen {
         .ns-chapter-progress p { margin:var(--sp-1) 0 0; }
         .ns-chapter-progress .ns-chapter-progress-note { color:var(--text-weak); font-size:var(--fs-tiny); }
         .ns-crisis-recovery { padding:var(--sp-3); border:2px solid var(--up); background:rgba(26,50,40,.94); box-shadow:3px 3px #000; color:var(--text-primary); font-size:var(--fs-caption); line-height:1.5; }
+        .ns-crisis-target { padding:var(--sp-3); border:2px solid var(--warn); background:rgba(48,40,28,.94); box-shadow:3px 3px #000; color:var(--text-primary); font-size:var(--fs-caption); line-height:1.5; }
+        .ns-crisis-target strong { display:block; margin-bottom:var(--sp-1); color:var(--warn); }
+        .ns-crisis-target-note { margin-top:var(--sp-1); color:var(--text-secondary); font-size:var(--fs-tiny); }
         .ns-npc { padding: var(--sp-3); background: rgba(25,28,35,.90); border:2px solid #777264; border-left: 4px solid #c6ae6d; border-radius: 0; box-shadow:3px 3px #000; }
         .ns-npc-name { margin-bottom: var(--sp-1); color: var(--text-secondary); font-size: var(--fs-caption); }
         .ns-npc-content { color: var(--text-secondary); font-size: var(--fs-body); line-height: 1.5; }

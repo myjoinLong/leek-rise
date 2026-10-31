@@ -19,6 +19,9 @@ function formatMoney(value: number): string {
 function formatUnsignedMoney(value: number): string {
   return Math.abs(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+function formatBalance(value: number): string {
+  return value.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+}
 function progressWidth(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
@@ -76,6 +79,21 @@ export function renderNightContent(state: NightVM): string {
       : '';
     const crisisRecovery = state.debtCrisisRecoveredTonight
       ? `<section class="ns-crisis-recovery" role="status"><strong>债务危机已解除</strong><div>当前负债 ¥${state.debt.toLocaleString()}，已回到 ¥${firstChapterMaximumDebt.toLocaleString()} 门槛内。存档继续保留，你可以按自己的节奏经营。</div></section>`
+      : '';
+    const crisisTarget = state.debtCrisisStarted
+      ? (() => {
+        const remaining = Math.max(0, state.debt - firstChapterMaximumDebt);
+        const maxRepayable = Math.min(Math.max(0, state.cash), Math.max(0, state.debt));
+        const progressNote = remaining > 0
+          ? `还需净减少 ¥${formatBalance(remaining)}。`
+          : '当前欠款已达到解除门槛，进入下一天时会确认危机状态。';
+        return `<section class="ns-crisis-target" aria-label="债务危机恢复目标">
+          <strong>债务危机 · 恢复目标</strong>
+          <div>当前负债 ¥${formatBalance(state.debt)} · 解除门槛 ¥${firstChapterMaximumDebt.toLocaleString()}</div>
+          <div>${progressNote}当前现金最多可偿还 ¥${formatBalance(maxRepayable)}。</div>
+          <div class="ns-crisis-target-note">利息或新增借款会改变差额；还清危机线不代表债务清零。</div>
+        </section>`;
+      })()
       : '';
     const costPolicy = state.periodicCostPolicy;
     const chapterGoal = state.day === firstChapterDeadlineDay
@@ -137,6 +155,7 @@ export function renderNightContent(state: NightVM): string {
       ${chapterProgress}
       ${chapterStatus}
       ${crisisRecovery}
+      ${crisisTarget}
       ${brokerageReview}
       ${chapterGoal}
       <section class="ns-status" aria-label="状态变化">

@@ -90,6 +90,7 @@ export function traceCompletedActivity(activity: ActiveActivityState): NpcActivi
     case 'BODHISATTVA_CHART_LESSON':
       return {
         ...createTrace(activity, activity.decisions.map((decision) => decision.choice), null, null, activity.score),
+        chartLessonOrder: activity.lessonOrder ?? [0, 1, 2],
         ...(activity.scenarioVersion === 2 ? {
           scenarioVersion: activity.scenarioVersion,
           scenarioSeed: activity.scenarioSeed ?? 4,
